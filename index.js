@@ -11,7 +11,7 @@ const { default: axios } = require('axios');
 const crypto = require("crypto");
 var fetch = require('node-fetch-polyfill');
 
-const whitelist = ["http://192.168.29.34:3000"];
+const whitelist = ["https://fiewin-43137.web.app"];
 let corsOptions = {
     origin: function (origin, callback) {
         if (whitelist.indexOf(origin) !== -1 || !origin) {
@@ -41,7 +41,7 @@ let roomId = 1036378203
 
 const io = new Server(server, {
     cors: {
-        origin: "http://192.168.29.34:3000",
+        origin: "https://fiewin-43137.web.app",
         methods: ["GET", "POST"]
     }
 });
