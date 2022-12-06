@@ -93,6 +93,14 @@ const fastParityOrderSchema = new mongoose.Schema({
     result: Number,
 })
 
+const diceOrderSchema = new mongoose.Schema({
+    id: String,
+    period: String,
+    amount: Number,
+    select: Number,
+    result: Number,
+})
+
 const balanceSchema = new mongoose.Schema({
     id: String,
     mainBalance: Number,
@@ -102,7 +110,7 @@ const balanceSchema = new mongoose.Schema({
 
 const depositSchema = new mongoose.Schema({
     id: String,
-    orderId: Number,
+    orderId: String,
     amount: Number,
     date: String
 })
@@ -143,11 +151,18 @@ const fastParitySchema = new mongoose.Schema({
     winner: String
 })
 
+const diceSchema = new mongoose.Schema({
+    id: String,
+    result: String
+})
+
 const userModel = mongoose.model('user', userSchema)
 const balanceModel = mongoose.model('balance', balanceSchema);
 const addCardModel = mongoose.model('account', addCardSchema);
 const fastParityModel = mongoose.model('fastParity', fastParitySchema)
 const fastParityOrderModel = mongoose.model('fastParityOrder', fastParityOrderSchema)
+const diceModel = mongoose.model('dice', diceSchema)
+const diceOrderModel = mongoose.model('diceOrder', diceOrderSchema)
 const checkInModel = mongoose.model('checkin', checkInSchema)
 const refModel = mongoose.model('referral', refSchema)
 const totalRefModel = mongoose.model('totalReferral', totalRefSchema)
@@ -408,35 +423,35 @@ app.post('/withdrawalRecords', async (req, res) => {
         const { id } = req.body;
         console.log(req.body);
 
-        const user = await userModel.findOne({ userToken: id});
+        const user = await userModel.findOne({ userToken: id });
         const records = await withdrawalModel.find({ id: user.id })
 
-        if(records.length === 0) return res.status(200).send({ success: true, records: false})
+        if (records.length === 0) return res.status(200).send({ success: true, records: false })
 
-        return res.status(200).send({ success: true, records: true, data: records})
+        return res.status(200).send({ success: true, records: true, data: records })
     } catch (error) {
         console.log('Error: ', error);
-        return res.status(400).send({ success: false, error: 'Something went wrong'})
+        return res.status(400).send({ success: false, error: 'Something went wrong' })
     }
 })
 
 app.post('/withdraw', async (req, res) => {
     try {
-        const { id, amount} = req.body;
+        const { id, amount } = req.body;
         console.log(req.body)
 
-        const user = await userModel.findOne({ userToken: id});
-        const balance = await balanceModel.findOne({ id: user.id});
-        const card = await addCardModel.findOne({ id: user.id, isActive: true});
+        const user = await userModel.findOne({ userToken: id });
+        const balance = await balanceModel.findOne({ id: user.id });
+        const card = await addCardModel.findOne({ id: user.id, isActive: true });
 
-        if(balance.mainBalance < parseFloat(amount)) return res.status(400).send({ success: false, error: 'Insufficient Balance'})
-        if(!card) return res.status(400).send({ success: false, error: 'No active payment method'})
+        if (balance.mainBalance < parseFloat(amount)) return res.status(400).send({ success: false, error: 'Insufficient Balance' })
+        if (!card) return res.status(400).send({ success: false, error: 'No active payment method' })
 
         let date = new Date();
         let rNumber = Math.floor(Math.random() * 10000)
         let eDate = date.getFullYear() + '' + ("0" + date.getMonth()).slice(-2) + '' + ("0" + date.getDate()).slice(-2) + '' + ("0" + date.getHours()).slice(-2) + '' + ("0" + date.getMinutes()).slice(-2) + '' + ("0" + date.getSeconds()).slice(-2) + '' + ("0" + date.getMilliseconds()).slice(-2) + '' + rNumber
 
-        if(card.isBank === true) {
+        if (card.isBank === true) {
             let data = new withdrawalModel({
                 id: user.id,
                 amount: parseFloat(amount) - (parseFloat(amount) * 2 / 100),
@@ -467,16 +482,16 @@ app.post('/withdraw', async (req, res) => {
             data.save()
         }
 
-        await balanceModel.updateOne({ id: user.id}, {
+        await balanceModel.updateOne({ id: user.id }, {
             $inc: {
                 mainBalance: -parseFloat(amount)
             }
         })
 
-        return res.status(200).send({ success: true})
+        return res.status(200).send({ success: true })
     } catch (error) {
         console.log('Error: ', error);
-        return res.status(400).send({ success: false, error: 'Something went wrong'})
+        return res.status(400).send({ success: false, error: 'Something went wrong' })
     }
 })
 
@@ -511,7 +526,7 @@ app.post('/account', async (req, res) => {
         })
     } catch (error) {
         console.log('Error: \n', error)
-            return res.status(400).send({ success: false, error: 'Something went wrong' })
+        return res.status(400).send({ success: false, error: 'Something went wrong' })
     }
 });
 
@@ -607,16 +622,16 @@ app.post('/team', async (req, res) => {
         const { id } = req.body;
         console.log(req.body);
 
-        const user = await userModel.findOne({ userToken: id})
-        const totalRef = await totalRefModel.findOne({ id: user.id})
-        const lv1 = await refModel.find({ id: user.id, level: 1})
-        const lv2 = await refModel.find({ id: user.id, level: 2})
-        const lv3 = await refModel.find({ id: user.id, level: 3})
+        const user = await userModel.findOne({ userToken: id })
+        const totalRef = await totalRefModel.findOne({ id: user.id })
+        const lv1 = await refModel.find({ id: user.id, level: 1 })
+        const lv2 = await refModel.find({ id: user.id, level: 2 })
+        const lv3 = await refModel.find({ id: user.id, level: 3 })
 
-        return res.status(200).send({ success: true, t1: totalRef.lv1, t2: totalRef.lv2, t3: totalRef.lv3, d1: lv1, d2: lv2, d3: lv3})
+        return res.status(200).send({ success: true, t1: totalRef.lv1, t2: totalRef.lv2, t3: totalRef.lv3, d1: lv1, d2: lv2, d3: lv3 })
     } catch (error) {
         console.log('Error: ', error);
-        return res.status(400).send({ success: false, error: 'Something went wrong'})
+        return res.status(400).send({ success: false, error: 'Something went wrong' })
     }
 })
 
@@ -640,8 +655,8 @@ app.post('/checkIn', async (req, res) => {
 
         let response = await collection.findOne({ userToken: id });
         let response3 = await collection2.findOne({ id: response.id });
-        let day = response3.day;
         let date = response3.date;
+        let day = aDate === date ? response3.day : 0
 
         if (aDate === date || aDate > date) {
             await collection3.updateOne({ id: response.id }, {
@@ -781,7 +796,7 @@ app.post('/deposit', async (req, res) => {
 
                     let deposit = new depositModel({
                         id: resp.id,
-                        orderId: parseFloat(data.ORDERID),
+                        orderId: data.ORDERID,
                         amount: parseFloat(data.TXNAMOUNT),
                         date: data.TXNDATE
                     })
@@ -899,13 +914,10 @@ app.post('/placeFastParityBet', async (req, res) => {
             })
         })
 
-        let myOrder = await fastParityOrderModel.find({ id: response.id })
-        let newBalance = await balanceModel.findOne({ id: response.id })
-
-        return res.status(200).send({ success: true, amount, period, user: response.id, balance: newBalance.mainBalance + newBalance.depositBalance, type: typeof select === 'string' ? 'color' : 'number', select: select, order: myOrder })
+        return res.status(200).send({ success: true, amount, period, user: response.id, type: typeof select === 'string' ? 'color' : 'number', select: select })
     } catch (error) {
         console.log('Error: ', error);
-        return res.status(400).send({ success: false, error: 'Something went wrong'})
+        return res.status(400).send({ success: false, error: 'Something went wrong' })
     }
 })
 
@@ -914,21 +926,26 @@ app.post('/myOrder', async (req, res) => {
         const { id } = req.body;
         console.log(req.body)
 
-        let user = await userModel.findOne({ userToken: id});
-        let myOrder = await fastParityOrderModel.find({ id: user.id })
+        let user = await userModel.findOne({ userToken: id });
+        let myOrder = await fastParityOrderModel.find({ id: user.id }).sort({ _id: -1 }).limit(25)
 
-        return res.status(200).send({ success: true, data: myOrder})
+        return res.status(200).send({ success: true, data: myOrder })
     } catch (error) {
         console.log('Error: ', error);
-        return res.status(400).send({ success: false, error: 'Something went wrong'})
+        return res.status(400).send({ success: false, error: 'Something went wrong' })
     }
 })
 
 io.on("connection", (socket) => {
     socket.join('fastParity');
+    socket.join('dice')
 
     socket.on("bet", ({ amount, user, period, select, type }) => {
         socket.to('fastParity').emit('betForward', { amount, user, select, type, period })
+    });
+
+    socket.on("betDice", ({ amount, user, period, select }) => {
+        socket.to('dice').emit('betForwardDice', { amount, user, select, period })
     });
 });
 
@@ -1008,6 +1025,152 @@ async function updateFastParityPeriod(id) {
 
         io.sockets.to('fastParity').emit('counter', { counter: counter });
         io.sockets.to('fastParity').emit('period', { period: newId });
+    } catch (error) {
+        console.log(error)
+    }
+}
+
+
+//dice
+app.get('/game/dice', async (req, res) => {
+    try {
+        diceModel.find().sort({ _id: -1 }).limit(25).then(response => {
+            res.status(200).send({ success: true, current: `${response[0].id}`, data: response })
+        })
+    } catch (error) {
+        console.log(error)
+    }
+})
+
+app.post('/myOrder/dice', async (req, res) => {
+    try {
+        const { id } = req.body;
+        console.log(req.body)
+
+        let user = await userModel.findOne({ userToken: id });
+        let myOrder = await diceOrderModel.find({ id: user.id }).sort({ _id: -1 }).limit(25)
+
+        return res.status(200).send({ success: true, data: myOrder })
+    } catch (error) {
+        console.log('Error: ', error);
+        return res.status(400).send({ success: false, error: 'Something went wrong' })
+    }
+})
+
+app.post('/placeDiceBet', async (req, res) => {
+    try {
+        const { amount, period, user, select } = req.body;
+        console.log(req.body)
+
+        let result = await client.connect()
+        let db = result.db('test')
+        let collection = db.collection('users');
+        let collection2 = db.collection('balances');
+
+        let response = await collection.findOne({ userToken: user });
+        let response2 = await collection2.findOne({ id: response.id });
+        let MBalance = parseFloat(response2.mainBalance)
+        let DBalance = parseFloat(response2.depositBalance)
+
+        if ((MBalance + DBalance) < amount) {
+            return res.status(400).send({ success: false, error: 'Not enough balance' })
+        }
+
+        let UPD = new diceOrderModel({
+            id: response.id,
+            period,
+            select: parseFloat(select),
+            amount
+        })
+
+        UPD.save(function (err, result) {
+            if (err) return res.status(400).send({ success: false, error: 'Failed to place bet' })
+
+            collection2.findOneAndUpdate({ id: response.id }, {
+                $set: {
+                    depositBalance: (DBalance - amount) < 0 ? 0 : DBalance - amount,
+                    mainBalance: (DBalance - amount) < 0 ? MBalance + (DBalance - amount) : MBalance
+                }
+            })
+        })
+
+        return res.status(200).send({ success: true, amount, period, user: response.id, select: select })
+    } catch (error) {
+        console.log('Error: ', error);
+        return res.status(400).send({ success: false, error: 'Something went wrong' })
+    }
+})
+
+async function dicePeriod() {
+    try {
+        let data = await diceModel.find().sort({ _id: -1 }).limit(1)
+        return data;
+    } catch (error) {
+        console.log(error)
+    }
+}
+
+async function getDiceId() {
+    let date = ("0" + new Date().getDate()).slice(-2);
+    let month = ("0" + new Date().getMonth()).slice(-2);
+    let year = ("0" + new Date().getFullYear()).slice(-2)
+    let a = year + '' + month + '' + date
+
+    let data = await dicePeriod()
+    if (data.length === 0 || !data[0].id?.slice(0, 6) === a) return year + '' + month + '' + date + '0001'
+    return parseFloat(data[0].id) + 1
+}
+
+var counter2 = 60;
+setInterval(function () {
+    io.sockets.to('dice').emit('counterDice', { counter: counter2 });
+    counter2--
+
+    if (counter2 === 0) {
+        dicePeriod().then(response => {
+            let roomId = parseFloat(response[0]?.id)
+
+            updateDicePeriod(roomId).then((response2) => {
+                counter2 = 60
+                io.sockets.to('dice').emit('counterDice', { counter: counter2 });
+            })
+        })
+    }
+}, 1000);
+
+async function updateDicePeriod(id) {
+    try {
+        let result = Math.floor(Math.random() * 100);
+
+        let newId = await getDiceId().then((response) => {
+            return response;
+        });
+
+        let updatePeriod = await diceModel.findOneAndUpdate({ id: id }, { $set: { result: result } });
+        let getPeriod = await diceModel.find().sort({ _id: -1 }).limit(26);
+        const firstUpdate = await diceOrderModel.updateMany({ period: id }, { $set: { result: result } });
+        const getFirstItems = await diceOrderModel.find({ period: id })
+
+        for (let i = 0; i < getFirstItems.length; i++) {
+            if(result < getFirstItems[i].select) {
+                let m = (95 / getFirstItems[i].select).toFixed(2)
+                await balanceModel.updateOne({ id: getFirstItems[i].id }, { $inc: { mainBalance: getFirstItems[i].amount * m } });
+            }
+        }
+
+        const nData = new diceModel({
+            id: newId.toString(),
+            result: '100'
+        })
+
+        if (getPeriod[25]) {
+            await diceModel.deleteOne({ id: getPeriod[25].id })
+        }
+
+        nData.save()
+
+        io.sockets.to('dice').emit('counterDice', { counter: counter });
+        io.sockets.to('dice').emit('periodDice', { period: newId });
     } catch (error) {
         console.log(error)
     }
