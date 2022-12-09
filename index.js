@@ -11,7 +11,7 @@ const { default: axios } = require('axios');
 const crypto = require("crypto");
 var fetch = require('node-fetch-polyfill');
 
-const whitelist = ["https://fiewin-43137.web.app"];
+const whitelist = ["https://fiewin-43137.web.app", "http://192.168.29.34:3000"];
 let corsOptions = {
     origin: function (origin, callback) {
         if (whitelist.indexOf(origin) !== -1 || !origin) {
@@ -41,7 +41,7 @@ let roomId = 1036378203
 
 const io = new Server(server, {
     cors: {
-        origin: "https://fiewin-43137.web.app",
+        origin: whitelist,
         methods: ["GET", "POST"]
     }
 });
@@ -938,7 +938,6 @@ app.post('/myOrder', async (req, res) => {
 
 io.on("connection", (socket) => {
     socket.join('fastParity');
-    socket.join('dice')
 
     socket.on("bet", ({ amount, user, period, select, type }) => {
         socket.to('fastParity').emit('betForward', { amount, user, select, type, period })
