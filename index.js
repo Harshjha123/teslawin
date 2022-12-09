@@ -41,7 +41,7 @@ let roomId = 1036378203
 
 const io = new Server(server, {
     cors: {
-        origin: whitelist,
+        origin: '*',
         methods: ["GET", "POST"]
     }
 });
@@ -938,6 +938,7 @@ app.post('/myOrder', async (req, res) => {
 
 io.on("connection", (socket) => {
     socket.join('fastParity');
+    socket.join('dice');
 
     socket.on("bet", ({ amount, user, period, select, type }) => {
         socket.to('fastParity').emit('betForward', { amount, user, select, type, period })
