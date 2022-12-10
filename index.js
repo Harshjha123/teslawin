@@ -27,7 +27,8 @@ app.use(express.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(cors(corsOptions));
 
-const uri = "mongodb+srv://biomeeadmin:jcxfYgWQKLOzxzhn@cluster0.xgynqbe.mongodb.net/?retryWrites=true&w=majority";
+//mongodb+srv://biomeeadmin:jcxfYgWQKLOzxzhn@cluster0.xgynqbe.mongodb.net/?retryWrites=true&w=majority
+const uri = "mongodb+srv://nawaz9980:oP4IP5uMqG3aYSzw@cluster0.qt8alkz.mongodb.net/?retryWrites=true&w=majority";
 mongoose.connect(uri).then(console.log('connected'))
 
 const client = new MongoClient(uri, {
@@ -845,16 +846,9 @@ async function getParityId() {
     let year = ("0" + new Date().getFullYear()).slice(-2)
     let a = year + '' + month + '' + date
 
-    let result;
-    await fastParityPeriod().then(response => {
-        if (response[0].id?.slice(0, 6) === a) {
-            result = parseFloat(response[0].id) + 1
-        } else {
-            result = year + '' + month + '' + date + '0001'
-        }
-    })
-
-    return result
+    let data = await fastParityPeriod()
+    if (data.length === 0 || !data[0].id?.slice(0, 6) === a) return year + '' + month + '' + date + '0001'
+    return parseFloat(data[0].id) + 1
 }
 
 app.get('/game/fastParity', async (req, res) => {
