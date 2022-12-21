@@ -29,7 +29,7 @@ app.use(cors(corsOptions));
 
 //mongodb+srv://nawaz9980:oP4IP5uMqG3aYSzw@cluster0.qt8alkz.mongodb.net/?retryWrites=true&w=majority
 //mongodb+srv://biomeeadmin:jcxfYgWQKLOzxzhn@cluster0.xgynqbe.mongodb.net/?retryWrites=true&w=majority
-const uri = "mongodb+srv://nawaz9980:oP4IP5uMqG3aYSzw@cluster0.qt8alkz.mongodb.net/?retryWrites=true&w=majority";
+const uri = "mongodb+srv://nawaz9980:oP4IP5uMqG3aYSzw@cluster0.qt8alkz.mongodb.net/?retryWrites=true&w=majority"
 mongoose.connect(uri).then(console.log('connected'))
 
 const client = new MongoClient(uri, {
@@ -39,11 +39,10 @@ const client = new MongoClient(uri, {
 });
 
 const server = http.createServer(app)
-let roomId = 1036378203
 
 const io = new Server(server, {
     cors: {
-        origin: '*',
+        origin: whitelist,
         methods: ["GET", "POST"]
     }
 });
@@ -388,7 +387,7 @@ app.post('/balance', async (req, res) => {
         let collection2 = db.collection('balances');
 
         collection.findOne({ userToken: id }).then(response => {
-            collection2.findOne({ id: response.id }).then(response2 => {
+            collection2.findOne({ id: response?.id }).then(response2 => {
                 return res.status(200).send({ success: true, withdraw: response2.mainBalance.toFixed(2), deposit: response2.depositBalance.toFixed(2), referral: response2.refBalance.toFixed(2) })
             }).catch(error => {
                 console.log('Error: \n', error)
@@ -848,7 +847,7 @@ async function getParityId() {
     let a = year + '' + month + '' + date
 
     let data = await fastParityPeriod()
-    if (data.length === 0 || !data[0].id?.slice(0, 6) === a) return year + '' + month + '' + date + '0001'
+    if (data.length === 0 || !data[0]?.id?.slice(0, 6) === a) return year + '' + month + '' + date + '0001'
     return parseFloat(data[0].id) + 1
 }
 
@@ -1043,7 +1042,7 @@ app.post('/myOrder/dice', async (req, res) => {
         console.log(req.body)
 
         let user = await userModel.findOne({ userToken: id });
-        let myOrder = await diceOrderModel.find({ id: user.id }).sort({ _id: -1 }).limit(25)
+        let myOrder = await diceOrderModel.find({ id: user?.id }).sort({ _id: -1 }).limit(25)
 
         return res.status(200).send({ success: true, data: myOrder })
     } catch (error) {
