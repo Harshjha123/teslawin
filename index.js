@@ -29,7 +29,7 @@ app.use(cors(corsOptions));
 
 //mongodb+srv://nawaz9980:oP4IP5uMqG3aYSzw@cluster0.qt8alkz.mongodb.net/?retryWrites=true&w=majority
 //mongodb+srv://biomeeadmin:jcxfYgWQKLOzxzhn@cluster0.xgynqbe.mongodb.net/?retryWrites=true&w=majority
-const uri = "mongodb+srv://nawaz9980:oP4IP5uMqG3aYSzw@cluster0.qt8alkz.mongodb.net/?retryWrites=true&w=majority"
+const uri = "mongodb+srv://biomeeadmin:jcxfYgWQKLOzxzhn@cluster0.xgynqbe.mongodb.net/?retryWrites=true&w=majority"
 mongoose.connect(uri).then(console.log('connected'))
 
 const client = new MongoClient(uri, {
@@ -157,6 +157,24 @@ const diceSchema = new mongoose.Schema({
     result: String
 })
 
+const minesweeperSchema = new mongoose.Schema({
+    period: String,
+    size: Number,
+    status: Boolean,
+    win: Boolean,
+    checked: {
+        type: Array,
+        default: []
+    },
+    amount: Number,
+    bomb: Number,
+    ATN: Number,
+    NCA: Number,
+    id: String,
+    betId: String
+})
+
+const sweeperModel = mongoose.model('minesweeper', minesweeperSchema)
 const userModel = mongoose.model('user', userSchema)
 const balanceModel = mongoose.model('balance', balanceSchema);
 const addCardModel = mongoose.model('account', addCardSchema);
@@ -842,12 +860,12 @@ function formatPeriod(id) {
 
 async function getParityId() {
     let date = ("0" + new Date().getDate()).slice(-2);
-    let month = ("0" + new Date().getMonth()).slice(-2);
+    let month = ("0" + (new Date().getMonth() + 1)).slice(-2);
     let year = ("0" + new Date().getFullYear()).slice(-2)
     let a = year + '' + month + '' + date
 
     let data = await fastParityPeriod()
-    if (data.length === 0 || !data[0]?.id?.slice(0, 6) === a) return year + '' + month + '' + date + '0001'
+    if (data.length === 0 || data[0]?.id?.slice(0, 6) !== a) return year + '' + month + '' + date + '0001'
     return parseFloat(data[0].id) + 1
 }
 
@@ -1004,6 +1022,9 @@ async function updateFastParityPeriod(id) {
                     await balanceModel.updateOne({ id: getFirstItems[i].id }, { $inc: { mainBalance: getFirstItems[i].amount * 9 } });
                 }
             }
+
+            let getD = await userModel.findOne({ id: getFirstItems[i].id })
+            io.sockets.to('fastParity').emit('result', { token: getD.userToken, period: id, price: 19975.01, type: getFirstItems[i].selectType === 'color' ? true : false, select: getFirstItems[i].select, point: getFirstItems[i].amount, result });
         }
 
         const nData = new fastParityModel({
@@ -1106,12 +1127,12 @@ async function dicePeriod() {
 
 async function getDiceId() {
     let date = ("0" + new Date().getDate()).slice(-2);
-    let month = ("0" + new Date().getMonth()).slice(-2);
+    let month = ("0" + (new Date().getMonth() + 1)).slice(-2);
     let year = ("0" + new Date().getFullYear()).slice(-2)
     let a = year + '' + month + '' + date
 
     let data = await dicePeriod()
-    if (data.length === 0 || !data[0].id?.slice(0, 6) === a) return year + '' + month + '' + date + '0001'
+    if (data.length === 0 || data[0].id?.slice(0, 6) !== a) return year + '' + month + '' + date + '0001'
     return parseFloat(data[0].id) + 1
 }
 
@@ -1169,3 +1190,136 @@ async function updateDicePeriod(id) {
         console.log(error)
     }
 }
+
+
+// Minesweeper
+app.post('/placeSweeperBet', async (req, res) => {
+    try {
+        const { amount, size, user} = req.body;
+        console.log(req.body)
+
+        let result = await client.connect()
+        let db = result.db('test')
+        let collection = db.collection('users');
+        let collection2 = db.collection('balances');
+
+        let response = await collection.findOne({ userToken: user });
+        let response2 = await collection2.findOne({ id: response.id });
+        let MBalance = parseFloat(response2.mainBalance)
+        let DBalance = parseFloat(response2.depositBalance)
+
+        if ((MBalance + DBalance) < amount) {
+            return res.status(400).send({ success: false, error: 'Not enough balance' })
+        }
+
+        let D = new Date()
+        let period = ("0" + new Date().getHours()).slice(-2) + '' + ("0" + new Date().getMinutes()).slice(-2)
+
+        let bomb;
+        if(size === 1) {
+            bomb = Math.floor(Math.random() * (4 - 1 + 1)) + 1
+        } else {
+            if(size === 2) {
+                bomb = Math.floor(Math.random() * (16 - 1 + 1)) + 1
+            } else {
+                if(size === 3) {
+                    bomb = Math.floor(Math.random() * (64 - 1 + 1)) + 1
+                }
+            }
+        }
+
+        let betId = ("0" + new Date().getDate()).slice(-2) + '' + ("0" + new Date().getMonth()).slice(-2) + '' + ("0" + new Date().getFullYear()).slice(-2) + '' + ("0" + new Date().getHours()).slice(-2) + '' + ("0" + new Date().getMinutes()).slice(-2) + '' + ("0" + new Date().getSeconds()).slice(-2)
+
+        let UPD = new sweeperModel({
+            period,
+            size,
+            status: false,
+            bomb,
+            ATN: 0,
+            NCA: 1,
+            id: response.id,
+            amount: amount,
+            betId
+        })
+
+        UPD.save(function (err, result) {
+            if (err) return res.status(400).send({ success: false, error: 'Failed to place bet' })
+
+            collection2.findOneAndUpdate({ id: response.id }, {
+                $set: {
+                    depositBalance: (DBalance - amount) < 0 ? 0 : DBalance - amount,
+                    mainBalance: (DBalance - amount) < 0 ? MBalance + (DBalance - amount) : MBalance
+                }
+            })
+        })
+
+        return res.status(200).send({ success: true, id: betId, amount: amount, ATN: 0, NCA: 1 })
+    } catch (error) {
+        console.log('Error: \n', error)
+    }
+});
+
+app.post('/pendingSweeperGame', async (req, res) => {
+    try {
+        const { id } = req.body;
+        console.log(req.body)
+
+        let result = await client.connect()
+        let db = result.db('test')
+        let collection = db.collection('users');
+
+        let response = await collection.findOne({ userToken: id });
+        let response3 = await sweeperModel.find({ id: response?.id }).sort({ createdAt: -1 }).limit(1)
+        let response2 = response3[0]
+
+        if(!response3[0] || response2.status) return res.status(200).send({ success: true, playing: false});
+
+        return res.status(200).send({ success: true, playing: true, size: response2.size, checked: response2.checked, amount: response2.amount, ATN: response2.ATN, NCA: response2.NCA, id: response2.betId })
+    } catch (error) {
+        console.log('Error: \n', error)
+    }
+})
+
+app.post('/claimBox', async (req, res) => {
+    try {
+        const {user, box, id} = req.body;
+        console.log(req.body);
+
+        let result = await client.connect()
+        let db = result.db('test')
+        let collection = db.collection('users');
+        let collection2 = db.collection('minesweepers');
+
+        let response = await collection.findOne({ userToken: user });
+        let response2 = await collection2.findOne({ id: response?.id, betId: id });
+        
+        let bombNo = response2.bomb;
+        if(bombNo === box) {
+            await collection2.findOneAndUpdate({ id: response.id, betId: id }, {
+                $set: {
+                    status: true,
+                    win: false
+                }
+            })
+
+            return res.status(200).send({ success: true, bomb: true})
+        }
+
+        if (response2?.checked.includes(box)) return res.status(200).send({ success: true, bomb: false })
+
+        await collection2.findOneAndUpdate({ id: response.id, betId: id }, {
+            $inc: {
+                ATN: 1
+            },
+            $push: {
+                checked: box
+            }
+        })
+
+        let nxt = await collection2.findOne({ id: response?.id, betId: id });
+
+        return res.status(200).send({ success: true, bomb: false, checked: nxt?.checked, amount: nxt?.amount, ATN: nxt?.NTA, NCA: nxt?.NCA })
+    } catch (error) {
+        console.log(error)
+    }
+})
