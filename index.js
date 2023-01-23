@@ -29,7 +29,7 @@ app.use(cors(corsOptions));
 
 //mongodb+srv://nawaz9980:oP4IP5uMqG3aYSzw@cluster0.qt8alkz.mongodb.net/?retryWrites=true&w=majority
 //mongodb+srv://biomeeadmin:jcxfYgWQKLOzxzhn@cluster0.xgynqbe.mongodb.net/?retryWrites=true&w=majority
-const uri = "mongodb+srv://biomeeadmin:jcxfYgWQKLOzxzhn@cluster0.xgynqbe.mongodb.net/?retryWrites=true&w=majority"
+const uri = "mongodb+srv://nawaz9980:oP4IP5uMqG3aYSzw@cluster0.qt8alkz.mongodb.net/?retryWrites=true&w=majority"
 mongoose.connect(uri).then(console.log('connected'))
 
 const client = new MongoClient(uri, {
@@ -92,6 +92,8 @@ const fastParityOrderSchema = new mongoose.Schema({
     selectType: String,
     select: String,
     result: Number,
+    point: Number,
+    time: String
 })
 
 const diceOrderSchema = new mongoose.Schema({
@@ -100,6 +102,8 @@ const diceOrderSchema = new mongoose.Schema({
     amount: Number,
     select: Number,
     result: Number,
+    point: Number,
+    time: String
 })
 
 const balanceSchema = new mongoose.Schema({
@@ -907,12 +911,17 @@ app.post('/placeFastParityBet', async (req, res) => {
             return res.status(400).send({ success: false, error: 'Not enough balance' })
         }
 
+        let date = ("0" + new Date().getDate()).slice(-2);
+        let month = ("0" + (new Date().getMonth() + 1)).slice(-2);
+        let h = ("0" + (new Date().getHours() + 1)).slice(-2) + ':' + ("0" + (new Date().getMinutes() + 1)).slice(-2) + ':' + ("0" + (new Date().getSeconds() + 1)).slice(-2)
+
         let UPD = new fastParityOrderModel({
             id: response.id,
             period,
             selectType: typeof select === 'string' ? 'color' : 'number',
             select,
-            amount
+            amount,
+            time: month + '/' + date + ' ' + h
         })
 
         UPD.save(function (err, result) {
@@ -1091,11 +1100,17 @@ app.post('/placeDiceBet', async (req, res) => {
             return res.status(400).send({ success: false, error: 'Not enough balance' })
         }
 
+        let date = ("0" + new Date().getDate()).slice(-2);
+        let month = ("0" + (new Date().getMonth() + 1)).slice(-2);
+        let h = ("0" + (new Date().getHours() + 1)).slice(-2) + ':' + ("0" + (new Date().getMinutes() + 1)).slice(-2) + ':' + ("0" + (new Date().getSeconds() + 1)).slice(-2)
+
+
         let UPD = new diceOrderModel({
             id: response.id,
             period,
             select: parseFloat(select),
-            amount
+            amount,
+            time: month + '/' + date + ' ' + h
         })
 
         UPD.save(function (err, result) {
@@ -1169,7 +1184,7 @@ async function updateDicePeriod(id) {
         for (let i = 0; i < getFirstItems.length; i++) {
             if(result < getFirstItems[i].select) {
                 let m = (95 / getFirstItems[i].select).toFixed(2)
-                await balanceModel.updateOne({ id: getFirstItems[i].id }, { $inc: { mainBalance: getFirstItems[i].amount * m } });
+                await balanceModel.updateOne({ id: getFirstItems[i].id }, { $inc: { mainBalance: getFirstItems[i].amount * m }});
             }
         }
 
