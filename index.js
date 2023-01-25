@@ -63,7 +63,16 @@ const refSchema = new mongoose.Schema({
     level: Number,
     date: String,
     totalDeposit: Number,
-    bonus: Number
+    bonus: Number,
+    period: Number
+})
+
+const newRefSchema = new mongoose.Schema({
+    id: String,
+    user: String,
+    level: Number,
+    commission: Number,
+    time: String
 })
 
 const totalRefSchema = new mongoose.Schema({
@@ -118,6 +127,15 @@ const depositSchema = new mongoose.Schema({
     orderId: String,
     amount: Number,
     date: String
+})
+
+const financialSchema = new mongoose.Schema({
+    id: String,
+    title: String,
+    date: String,
+    amount: Number,
+    type: Boolean,
+    image: String
 })
 
 const addCardSchema = new mongoose.Schema({
@@ -178,6 +196,9 @@ const minesweeperSchema = new mongoose.Schema({
     betId: String
 })
 
+
+const newRefModel = mongoose.model('newref', newRefSchema)
+const financialModel = mongoose.model('financial', financialSchema)
 const sweeperModel = mongoose.model('minesweeper', minesweeperSchema)
 const userModel = mongoose.model('user', userSchema)
 const balanceModel = mongoose.model('balance', balanceSchema);
@@ -291,6 +312,15 @@ app.post('/register', async (req, res) => {
             lv1: lv1 ? lv1 : null,
             lv2: lv2 ? lv2 : null,
             lv3: lv3 ? lv3 : null
+        });
+
+        const fi = new financialModel({
+            id: uid,
+            title: 'Registration Bonus',
+            date: m + '/' + d2 + ' ' + h + ':' + m2,
+            amount: 10,
+            type: true,
+            image: 'https://res.cloudinary.com/fiewin/image/upload/images/checkInReward.png'
         })
 
         const balance = balanceModel({
@@ -313,6 +343,8 @@ app.post('/register', async (req, res) => {
             lv3: 0
         })
 
+        let per = ("0" + new Date().getDate()).slice(-2) + "" + ("0" + new Date().getMonth()).slice(-2) + "" + ("0" + new Date().getFullYear()).slice(-4)
+
         let lv1Data, lv2Data, lv3Data;
         if (lv1) {
             lv1Data = new refModel({
@@ -321,7 +353,8 @@ app.post('/register', async (req, res) => {
                 level: 1,
                 date: `${d2}/${m}/${y} ${h}:${m2}`,
                 totalDeposit: 0,
-                bonus: 1
+                bonus: 1,
+                period: parseFloat(per)
             })
         }
 
@@ -332,7 +365,8 @@ app.post('/register', async (req, res) => {
                 level: 2,
                 date: `${d2}/${m}/${y} ${h}:${m2}`,
                 totalDeposit: 0,
-                bonus: 0
+                bonus: 0,
+                period: parseFloat(per)
             })
         }
 
@@ -343,7 +377,8 @@ app.post('/register', async (req, res) => {
                 level: 3,
                 date: `${d2}/${m}/${y} ${h}:${m2}`,
                 totalDeposit: 0,
-                bonus: 0
+                bonus: 0,
+                period: parseFloat(per)
             })
         }
 
@@ -351,6 +386,7 @@ app.post('/register', async (req, res) => {
         balance.save()
         totalRef.save()
         checkInData.save()
+        fi.save()
 
         if (lv1) {
             collection3.findOneAndUpdate({ id: lv1 }, { $inc: { refBalance: 1 } })
@@ -790,6 +826,59 @@ app.post('/addCard', async (req, res) => {
     } catch (error) {
 
     }
+});
+
+app.post('/fetchRefDetail', async (req, res) => {
+    try {
+        const { id } = req.body;
+        console.log(req.body);
+
+        let result = await client.connect()
+        let db = result.db('test')
+        let collection = db.collection('users');
+        let collection2 = db.collection('newrefs');
+
+        let per = ("0" + new Date().getDate()).slice(-2) + "" + ("0" + new Date().getMonth()).slice(-2) + "" + ("0" + new Date().getFullYear()).slice(-4)
+
+        let resp = await collection.findOne({ userToken: id });
+        let a = await collection2.find({ id: resp.id, period: parseFloat(per) }).toArray()
+        let b = await collection2.find({ id: resp.id }).toArray()
+        let c = await collection2.find({ id: resp.id }).sort({ _id: -1 }).limit(10).toArray()
+
+        var total = 0;
+        for (var i in a) {
+            total += a[i].commission;
+        }
+
+        var total2 = 0;
+        for (var i in b) {
+            total2 += b[i].commission;
+        }
+
+        return res.status(200).send({ success: true, todayInv: a.length, todayInc: total, totalInv: b.length, totalInc: total2, data: c })
+    } catch (error) {
+        
+    }
+})
+
+app.post('/fetchFinancialRecords', async (req, res) => {
+    try {
+        const { id } = req.body;
+        console.log(req.body);
+
+        let result = await client.connect()
+        let db = result.db('test')
+        let collection = db.collection('users');
+        let collection2 = db.collection('financials');
+
+        let d = await collection.findOne({ userToken: id })
+        
+        financialModel.find({ id: d.id }).sort({ _id: -1 }).limit(10).then((response) => {
+            return res.status(200).send({ success: true, data: response })
+        })
+    } catch (error) {
+        
+    }
 })
 
 app.post('/deposit', async (req, res) => {
@@ -924,6 +1013,46 @@ app.post('/placeFastParityBet', async (req, res) => {
             time: month + '/' + date + ' ' + h
         })
 
+        let newRef1, newRef2, newRef3;
+        if(response.lv1) {
+            newRef1 = new newRefModel({
+                id: response.lv1,
+                user: response.id,
+                level: 1,
+                commission: amount * (40 / 100),
+                time: month + '/' + date + ' ' + ("0" + (new Date().getHours() + 1)).slice(-2) + ':' + ("0" + (new Date().getMinutes() + 1)).slice(-2)
+            })
+        }
+
+        if(response.lv2) {
+            newRef2 = new newRefModel({
+                id: response.lv2,
+                user: response.id,
+                level: 2,
+                commission: amount * (20 / 100),
+                time: month + '/' + date + ' ' + ("0" + (new Date().getHours() + 1)).slice(-2) + ':' + ("0" + (new Date().getMinutes() + 1)).slice(-2)
+            })
+        }
+
+        if(response.lv3) {
+            newRef3 = new newRefModel({
+                id: response.lv3,
+                user: response.id,
+                level: 3,
+                commission: amount * (10 / 100),
+                time: month + '/' + date + ' ' + ("0" + (new Date().getHours() + 1)).slice(-2) + ':' + ("0" + (new Date().getMinutes() + 1)).slice(-2)
+            })
+        }
+
+        const fi = new financialModel({
+            id: response.id,
+            title: 'Fast Parity Order Expense',
+            date: month + '/' + date + ' ' + ("0" + (new Date().getHours() + 1)).slice(-2) + ':' + ("0" + (new Date().getMinutes() + 1)).slice(-2),
+            amount: amount,
+            type: false,
+            image: 'https://res.cloudinary.com/fiewin/image/upload/images/FastParityExpense.png'
+        })
+
         UPD.save(function (err, result) {
             if (err) return res.status(400).send({ success: false, error: 'Failed to place bet' })
 
@@ -933,6 +1062,35 @@ app.post('/placeFastParityBet', async (req, res) => {
                     mainBalance: (DBalance - amount) < 0 ? MBalance + (DBalance - amount) : MBalance
                 }
             })
+
+            fi.save()
+
+            if(response.lv1) {
+                newRef1.save()
+                collection2.findOneAndUpdate({ id: response.lv1 }, {
+                    $set: {
+                        refBalance: amount * (40 / 100)
+                    }
+                })
+            }
+
+            if(response.lv2) {
+                newRef2.save()
+                collection2.findOneAndUpdate({ id: response.lv2 }, {
+                    $set: {
+                        refBalance: amount * (20 / 100)
+                    }
+                })
+            }
+
+            if (response.lv3) {
+                newRef3.save()
+                collection2.findOneAndUpdate({ id: response.lv3 }, {
+                    $set: {
+                        refBalance: amount * (10 / 100)
+                    }
+                })
+            }
         })
 
         return res.status(200).send({ success: true, amount, period, user: response.id, type: typeof select === 'string' ? 'color' : 'number', select: select })
@@ -1018,21 +1176,37 @@ async function updateFastParityPeriod(id) {
         const getFirstItems = await fastParityOrderModel.find({ period: id })
 
         for (let i = 0; i < getFirstItems.length; i++) {
+            let al;
             if (getFirstItems[i].selectType === 'color') {
                 if (getFirstItems[i].select === resultInColor) {
+                    al = getFirstItems[i].amount * 2
                     await balanceModel.updateOne({ id: getFirstItems[i].id }, { $inc: { mainBalance: getFirstItems[i].amount * 2 } });
                 } else {
                     if (getFirstItems[i].select === 'V' && isV) {
+                        al = getFirstItems[i].amount * 4.5
                         await balanceModel.updateOne({ id: getFirstItems[i].id }, { $inc: { mainBalance: getFirstItems[i].amount * 4.5 } });
                     }
                 }
             } else {
                 if (getFirstItems[i].selectType === 'number' && getFirstItems[i].select === result) {
+                    al = getFirstItems[i].amount * 9
                     await balanceModel.updateOne({ id: getFirstItems[i].id }, { $inc: { mainBalance: getFirstItems[i].amount * 9 } });
                 }
             }
 
             let getD = await userModel.findOne({ id: getFirstItems[i].id })
+
+            const fi = new financialModel({
+                id: getFirstItems[i].id,
+                title: 'Fast Parity Income',
+                date: ("0" + (new Date().getMonth() + 1)).slice(-2) + '/' + ("0" + (new Date().getDate())).slice(-2) + ' ' + ("0" + (new Date().getHours() + 1)).slice(-2) + ':' + ("0" + (new Date().getMinutes() + 1)).slice(-2),
+                amount: al,
+                type: true,
+                image: 'https://res.cloudinary.com/fiewin/image/upload/images/FastParityIncome.png'
+            })
+
+            fi.save()
+
             io.sockets.to('fastParity').emit('result', { token: getD.userToken, period: id, price: 19975.01, type: getFirstItems[i].selectType === 'color' ? true : false, select: getFirstItems[i].select, point: getFirstItems[i].amount, result });
         }
 
@@ -1113,6 +1287,46 @@ app.post('/placeDiceBet', async (req, res) => {
             time: month + '/' + date + ' ' + h
         })
 
+        let newRef1, newRef2, newRef3;
+        if (response.lv1) {
+            newRef1 = new newRefModel({
+                id: response.lv1,
+                user: response.id,
+                level: 1,
+                commission: amount * (40 / 100),
+                time: month + '/' + date + ' ' + ("0" + (new Date().getHours() + 1)).slice(-2) + ':' + ("0" + (new Date().getMinutes() + 1)).slice(-2)
+            })
+        }
+
+        if (response.lv2) {
+            newRef2 = new newRefModel({
+                id: response.lv2,
+                user: response.id,
+                level: 2,
+                commission: amount * (20 / 100),
+                time: month + '/' + date + ' ' + ("0" + (new Date().getHours() + 1)).slice(-2) + ':' + ("0" + (new Date().getMinutes() + 1)).slice(-2)
+            })
+        }
+
+        if (response.lv3) {
+            newRef3 = new newRefModel({
+                id: response.lv3,
+                user: response.id,
+                level: 3,
+                commission: amount * (10 / 100),
+                time: month + '/' + date + ' ' + ("0" + (new Date().getHours() + 1)).slice(-2) + ':' + ("0" + (new Date().getMinutes() + 1)).slice(-2)
+            })
+        }
+
+        const fi = new financialModel({
+            id: response.id,
+            title: 'Dice Order Expense',
+            date: ("0" + (new Date().getMonth() + 1)).slice(-2) + '/' + ("0" + (new Date().getDate())).slice(-2) + ' ' + ("0" + (new Date().getHours() + 1)).slice(-2) + ':' + ("0" + (new Date().getMinutes() + 1)).slice(-2),
+            amount: amount,
+            type: false,
+            image: 'https://res.cloudinary.com/fiewin/image/upload/images/diceExpense.png'
+        })
+
         UPD.save(function (err, result) {
             if (err) return res.status(400).send({ success: false, error: 'Failed to place bet' })
 
@@ -1122,6 +1336,35 @@ app.post('/placeDiceBet', async (req, res) => {
                     mainBalance: (DBalance - amount) < 0 ? MBalance + (DBalance - amount) : MBalance
                 }
             })
+
+            fi.save()
+
+            if (response.lv1) {
+                newRef1.save()
+                collection2.findOneAndUpdate({ id: response.lv1 }, {
+                    $set: {
+                        refBalance: amount * (40 / 100)
+                    }
+                })
+            }
+
+            if (response.lv2) {
+                newRef2.save()
+                collection2.findOneAndUpdate({ id: response.lv2 }, {
+                    $set: {
+                        refBalance: amount * (20 / 100)
+                    }
+                })
+            }
+
+            if (response.lv3) {
+                newRef3.save()
+                collection2.findOneAndUpdate({ id: response.lv3 }, {
+                    $set: {
+                        refBalance: amount * (10 / 100)
+                    }
+                })
+            }
         })
 
         return res.status(200).send({ success: true, amount, period, user: response.id, select: select })
@@ -1182,10 +1425,24 @@ async function updateDicePeriod(id) {
         const getFirstItems = await diceOrderModel.find({ period: id })
 
         for (let i = 0; i < getFirstItems.length; i++) {
+            let m = (95 / getFirstItems[i].select).toFixed(2)
             if(result < getFirstItems[i].select) {
-                let m = (95 / getFirstItems[i].select).toFixed(2)
                 await balanceModel.updateOne({ id: getFirstItems[i].id }, { $inc: { mainBalance: getFirstItems[i].amount * m }});
+
+                const fi = new financialModel({
+                    id: getFirstItems[i].id,
+                    title: 'Dice Income',
+                    date: ("0" + (new Date().getMonth() + 1)).slice(-2) + '/' + ("0" + (new Date().getDate())).slice(-2) + ' ' + ("0" + (new Date().getHours() + 1)).slice(-2) + ':' + ("0" + (new Date().getMinutes() + 1)).slice(-2),
+                    amount: getFirstItems[i].amount * m,
+                    type: true,
+                    image: 'https://res.cloudinary.com/fiewin/image/upload/images/diceIncome.png'
+                })
+
+                fi.save()
             }
+
+            let getD = await userModel.findOne({ id: getFirstItems[i].id })
+            io.sockets.to('dice').emit('result2', { token: getD.userToken, period: id, price: 19975.01, select: getFirstItems[i].select, point: getFirstItems[i].amount, result });
         }
 
         const nData = new diceModel({
