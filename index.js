@@ -27,9 +27,9 @@ app.use(express.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(cors(corsOptions));
 
-//mongodb+srv://nawaz9980:oP4IP5uMqG3aYSzw@cluster0.qt8alkz.mongodb.net/?retryWrites=true&w=majority
+//mongodb+srv://teslawinadmin:anand0024@cluster0.ubmxhuq.mongodb.net/?retryWrites=true&w=majority
 //mongodb+srv://biomeeadmin:jcxfYgWQKLOzxzhn@cluster0.xgynqbe.mongodb.net/?retryWrites=true&w=majority
-const uri = "mongodb+srv://nawaz9980:oP4IP5uMqG3aYSzw@cluster0.qt8alkz.mongodb.net/?retryWrites=true&w=majority"
+const uri = "mongodb+srv://teslawinadmin:anand0024@cluster0.ubmxhuq.mongodb.net/?retryWrites=true&w=majority"
 mongoose.connect(uri).then(console.log('connected'))
 
 const client = new MongoClient(uri, {
