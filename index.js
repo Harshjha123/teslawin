@@ -1683,7 +1683,7 @@ app.get('/r', async (req, res) => {
         const uid = randomString(15, '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ')
         console.log(uid)
 
-        await axios.post(`http://43.205.82.74/crt2.php`, { amount: 100, order: uid, url: 'https://coral-app-mtvjf.ondigitalocean.app/r2' }).then((response) => {
+        await axios.post(`http://43.205.82.74/crt2.php`, { amount: 100, order: uid, url: 'https://tganand.xyz/vf122.php' }).then((response) => {
             console.log(response.data)
         })
     } catch (error) {
