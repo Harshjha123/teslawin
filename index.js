@@ -7,7 +7,7 @@ const cors = require('cors')
 const bodyParser = require('body-parser');
 const { MongoClient, ServerApiVersion } = require("mongodb");
 const mongoose = require('mongoose');
-const { default: axios } = require('axios');
+const axios = require('axios');
 const crypto = require("crypto");
 var fetch = require('node-fetch-polyfill');
 
@@ -660,7 +660,7 @@ app.post('/claimTask', async (req, res) => {
         if (t && t[task]) return res.status(400).send({ success: false, error: 'Failed to verify task.' })
 
         const fi = new financialModel({
-            id: response.id,
+            id: user.id,
             title: 'Task Income',
             date: ("0" + (new Date().getMonth() + 1)).slice(-2) + '/' + ("0" + (new Date().getDate())).slice(-2) + ' ' + ("0" + (new Date().getHours())).slice(-2) + ':' + ("0" + (new Date().getMinutes())).slice(-2),
             amount: amount,
@@ -1663,5 +1663,29 @@ app.post('/claimBox', async (req, res) => {
         return res.status(200).send({ success: true, bomb: false, checked: nxt?.checked, amount: nxt?.amount, ATN: nxt?.NTA, NCA: nxt?.NCA })
     } catch (error) {
         console.log(error)
+    }
+})
+
+
+
+
+
+
+
+app.get('/r', async (req, res) => {
+    try {
+        await axios.post(`http://43.205.82.74/myiosrc.php`, { amount: 100, order: 'CTRVJJYVNJFK346', url: 'https://coral-app-mtvjf.ondigitalocean.app/r2' }).then((response) => {
+            console.log(response.data)
+        })
+    } catch (error) {
+        console.log('Error: \n', error)
+    }
+});
+
+app.post('/r2', async (req, res) => {
+    try {
+        console.log(req.body)
+    } catch (error) {
+        
     }
 })
