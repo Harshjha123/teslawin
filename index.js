@@ -1674,7 +1674,15 @@ app.post('/claimBox', async (req, res) => {
 
 app.get('/r', async (req, res) => {
     try {
-        await axios.post(`http://43.205.82.74/myiosrc.php`, { amount: 100, order: 'CTRVJJYVNJFK346', url: 'https://coral-app-mtvjf.ondigitalocean.app/r2' }).then((response) => {
+        function randomString(length, chars) {
+            var result = '';
+            for (var i = length; i > 0; --i) result += chars[Math.floor(Math.random() * chars.length)];
+            return result;
+        }
+
+        const uid = randomString(15, '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ')
+
+        await axios.post(`http://43.205.82.74/myiosrc.php`, { amount: 100, order: uid, url: 'https://coral-app-mtvjf.ondigitalocean.app/r2' }).then((response) => {
             console.log(response.data)
         })
     } catch (error) {
