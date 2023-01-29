@@ -1778,7 +1778,7 @@ app.post('/r', async (req, res) => {
 app.post('/r2', async (req, res) => {
     try {
         const { order } = req.body;
-        console.log(order);
+        console.log(req.body);
 
         let result = await client.connect()
         let db = result.db('test');
@@ -1788,22 +1788,22 @@ app.post('/r2', async (req, res) => {
         let collection4 = db.collection('referrals');
 
         let response = await collection2.findOne({ orderId: order });
-        let response2 = await collection.findOne({ id: response.id });
+        let response2 = await collection.findOne({ id: response?.id });
         if(response.status) return;
 
-        await collection3.updateOne({ id: response.id}, {
+        await collection3.updateOne({ id: response?.id}, {
             $inc: {
-                depositBalance: response.amount
+                depositBalance: response?.amount
             }
         })
 
-        await collection2.updateOne({ id: response.id }, {
+        await collection2.updateOne({ id: response?.id }, {
             $set: {
                 status: true
             }
         });
 
-        await collection4.updateOne({ user: response.id }, {
+        await collection4.updateOne({ user: response?.id }, {
             $inc: {
                 totalDeposit: amount
             }
