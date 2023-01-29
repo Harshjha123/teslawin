@@ -1805,7 +1805,7 @@ app.post('/r2', async (req, res) => {
 
         await collection4.updateOne({ user: response?.id }, {
             $inc: {
-                totalDeposit: amount
+                totalDeposit: response?.amount
             }
         })
 
