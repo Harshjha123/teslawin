@@ -55,6 +55,12 @@ const checkInSchema = new mongoose.Schema({
     id: String,
     day: Number,
     date: Number
+});
+
+const dailyRecSchema = new mongoose.Schema({
+    id: String,
+    date: String,
+    amount: Number
 })
 
 const refSchema = new mongoose.Schema({
@@ -126,7 +132,8 @@ const depositSchema = new mongoose.Schema({
     id: String,
     orderId: String,
     amount: Number,
-    date: String
+    date: String,
+    status: Boolean
 })
 
 const orderBookSchema = new mongoose.Schema({
@@ -205,7 +212,7 @@ const minesweeperSchema = new mongoose.Schema({
     betId: String
 })
 
-
+const dailyRecModel = new mongoose.model('dailyrec', dailyRecSchema)
 const newRefModel = mongoose.model('newref', newRefSchema)
 const orderBookModel = mongoose.model('order', orderBookSchema)
 const financialModel = mongoose.model('financial', financialSchema)
@@ -473,7 +480,7 @@ app.post('/balance', async (req, res) => {
 
         collection.findOne({ userToken: id }).then(response => {
             collection2.findOne({ id: response?.id }).then(response2 => {
-                return res.status(200).send({ success: true, withdraw: response2.mainBalance.toFixed(2), deposit: response2.depositBalance.toFixed(2), referral: response2.refBalance.toFixed(2) })
+                return res.status(200).send({ success: true, withdraw: response2?.mainBalance.toFixed(2), deposit: response2?.depositBalance.toFixed(2), referral: response2?.refBalance.toFixed(2) })
             }).catch(error => {
                 console.log('Error: \n', error)
                 return res.status(400).send({ success: false, error: 'Unable to fetch account.' })
@@ -663,7 +670,7 @@ app.post('/claimTask', async (req, res) => {
             id: user.id,
             title: 'Task Income',
             date: ("0" + (new Date().getMonth() + 1)).slice(-2) + '/' + ("0" + (new Date().getDate())).slice(-2) + ' ' + ("0" + (new Date().getHours())).slice(-2) + ':' + ("0" + (new Date().getMinutes())).slice(-2),
-            amount: amount,
+            amount: bonus[task],
             type: true,
             image: 'https://res.cloudinary.com/fiewin/image/upload/images/learnReward.png'
         })
@@ -703,7 +710,7 @@ app.post('/getTask', async (req, res) => {
         console.log(req.body);
 
         const user = await userModel.findOne({ userToken: id })
-        const deposit = await depositModel.find({ id: user.id })
+        const deposit = await depositModel.find({ id: user.id, status: true })
         const invite = await totalRefModel.findOne({ id: user.id })
         const order = await orderBookModel.findOne({ id: user.id })
         const task = await taskModel.findOne({ id: user.id })
@@ -904,7 +911,62 @@ app.post('/fetchRefDetail', async (req, res) => {
             total2 += b[i].commission;
         }
 
-        return res.status(200).send({ success: true, todayInv: a.length, todayInc: total, totalInv: b.length, totalInc: total2, data: c })
+        function eliminateDuplicates(arr) {
+            var i,
+                len = arr.length,
+                out = [],
+                obj = {};
+
+            for (i = 0; i < len; i++) {
+                obj[arr[i].user] = 0;
+            }
+            for (i in obj) {
+                out.push(i);
+            }
+            return out;
+        }
+
+        return res.status(200).send({ success: true, todayInv: eliminateDuplicates(a).length, todayInc: total, totalInv: eliminateDuplicates(b).length, totalInc: total2, data: c })
+    } catch (error) {
+        
+    }
+});
+
+app.post('/fetchReff', async (req, res) => {
+    try {
+        const { id } = req.body;
+        console.log(req.body);
+
+        let result = await client.connect()
+        let db = result.db('test')
+        let collection = db.collection('users');
+        let collection2 = db.collection('newrefs');
+
+        let per = ("0" + new Date().getDate()).slice(-2) + "" + ("0" + new Date().getMonth() + 1).slice(-2) + "" + ("0" + new Date().getFullYear()).slice(-4)
+        
+        let resp = await collection.findOne({ userToken: id });
+        let c = await collection2.find({ id: resp.id }).sort({ _id: -1 }).toArray();
+
+        return res.status(200).send({ success: false, data: c})
+    } catch (error) {
+        
+    }
+});
+
+app.post('/fetchDailyRec', async (req, res) => {
+    try {
+        const { id } = req.body;
+        console.log(req.body)
+
+        let result = await client.connect()
+        let db = result.db('test')
+        let collection = db.collection('users');
+        let collection2 = db.collection('dailyrecs');;
+
+        let resp = await collection.findOne({ userToken: id });
+        let c = await collection2.find({ id: resp.id }).sort({ _id: -1 }).toArray();
+
+        return res.status(200).send({ success: true, data: c})
     } catch (error) {
         
     }
@@ -982,7 +1044,7 @@ app.post('/rechargeRecords', async (req, res) => {
 
         const user = await userModel.findOne({ userToken: id })
         const records = await depositModel.find({ id: user.id })
-
+        
         if (records.length === 0) return res.status(200).send({ success: true, isData: false })
 
         return res.status(200).send({ success: true, isData: true, data: records })
@@ -1039,6 +1101,8 @@ app.post('/placeFastParityBet', async (req, res) => {
         let db = result.db('test')
         let collection = db.collection('users');
         let collection2 = db.collection('balances');
+        let collection5 = db.collection('orders')
+        const collection6 = db.collection('dailyrecs')
 
         let response = await collection.findOne({ userToken: user });
         let response2 = await collection2.findOne({ id: response.id });
@@ -1105,7 +1169,7 @@ app.post('/placeFastParityBet', async (req, res) => {
             amount: amount,
             type: false,
             image: 'https://res.cloudinary.com/fiewin/image/upload/images/FastParityExpense.png'
-        })
+        });
 
         UPD.save(function (err, result) {
             if (err) return res.status(400).send({ success: false, error: 'Failed to place bet' })
@@ -1117,7 +1181,7 @@ app.post('/placeFastParityBet', async (req, res) => {
                 }
             })
 
-            orderBookModel.findOneAndUpdate({ id: response.id }, {
+            collection5.findOneAndUpdate({ id: response.id }, {
                 $inc: {
                     parity: 1
                 }
@@ -1131,7 +1195,7 @@ app.post('/placeFastParityBet', async (req, res) => {
                     $inc: {
                         refBalance: amount * (2 / 100)
                     }
-                })
+                });
             }
 
             if(response.lv2) {
@@ -1324,6 +1388,7 @@ app.post('/placeDiceBet', async (req, res) => {
         let db = result.db('test')
         let collection = db.collection('users');
         let collection2 = db.collection('balances');
+        let collection5 = db.collection('orders')
 
         let response = await collection.findOne({ userToken: user });
         let response2 = await collection2.findOne({ id: response.id });
@@ -1401,7 +1466,7 @@ app.post('/placeDiceBet', async (req, res) => {
                 }
             })
 
-            orderBookModel.findOneAndUpdate({ id: response.id }, {
+            collection5.findOneAndUpdate({ id: response.id }, {
                 $inc: {
                     dice: 1
                 }
@@ -1672,8 +1737,17 @@ app.post('/claimBox', async (req, res) => {
 
 
 
-app.get('/r', async (req, res) => {
+app.post('/r', async (req, res) => {
     try {
+        const { id, amount} = req.body;
+        console.log(req.body);
+
+        let result = await client.connect()
+        let db = result.db('test')
+        let collection = db.collection('users');
+
+        let response = await collection.findOne({ userToken: id });
+
         function randomString(length, chars) {
             var result = '';
             for (var i = length; i > 0; --i) result += chars[Math.floor(Math.random() * chars.length)];
@@ -1681,20 +1755,63 @@ app.get('/r', async (req, res) => {
         }
 
         const uid = randomString(15, '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ')
-        console.log(uid)
+        let per = ("0" + new Date().getDate()).slice(-2) + "/" + ("0" + new Date().getMonth() + 1).slice(-2) + "/" + ("0" + new Date().getFullYear()).slice(-4) + " " + ("0" + new Date().getHours()).slice(-2) + ":" + ("0" + new Date().getMinutes()).slice(-2)
 
-        await axios.post(`http://43.205.82.74/crt2.php`, { amount: 100, order: uid, url: 'https://tganand.xyz/vf122.php' }).then((response) => {
-            console.log(response.data)
+        let o = new depositModel({
+            id: response?.id,
+            orderId: uid,
+            amount: amount,
+            date: per,
+            status: false
         })
+
+        let d = await axios.post(`http://43.205.82.74/crt2.php`, { amount: 100, order: uid, url: 'https://tganand.xyz/vf122.php' })
+        
+        o.save()
+        return res.status(200).send({ success: true, url: d.data.payurl })
     } catch (error) {
         console.log('Error: \n', error)
+        return res.status(400).send({ success: false, error: 'Failed to make deposit.' })
     }
 });
 
 app.post('/r2', async (req, res) => {
     try {
-        console.log(req.body)
+        const { order } = req.body;
+        console.log(order);
+
+        let result = await client.connect()
+        let db = result.db('test');
+        let collection = db.collection('users');
+        let collection2 = db.collection('deposits');
+        let collection3 = db.collection('balances');
+        let collection4 = db.collection('referrals');
+
+        let response = await collection2.findOne({ orderId: order });
+        let response2 = await collection.findOne({ id: response.id });
+        if(response.status) return;
+
+        await collection3.updateOne({ id: response.id}, {
+            $inc: {
+                depositBalance: response.amount
+            }
+        })
+
+        await collection2.updateOne({ id: response.id }, {
+            $set: {
+                status: true
+            }
+        });
+
+        await collection4.updateOne({ user: response.id }, {
+            $inc: {
+                totalDeposit: amount
+            }
+        })
+
+        return res.status(200).send({ success: true})
     } catch (error) {
-        
+        console.log('Error: \n', error);
+        return res.status(200).send({ success: false, error: 'Failed to fetch order'})
     }
 })
