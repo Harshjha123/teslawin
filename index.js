@@ -78,7 +78,9 @@ const newRefSchema = new mongoose.Schema({
     level: Number,
     commission: Number,
     time: String,
-    period: Number
+    period: Number,
+    image: String,
+    title: String
 })
 
 const totalRefSchema = new mongoose.Schema({
@@ -388,7 +390,9 @@ app.post('/register', async (req, res) => {
                 level: 1,
                 commission: 1,
                 time: m + '/' + d2 + ' ' + ("0" + (new Date().getHours() + 1)).slice(-2) + ':' + ("0" + (new Date().getMinutes() + 1)).slice(-2),
-                period: parseFloat(per)
+                period: parseFloat(per),
+                image: 'https://res.cloudinary.com/fiewin/image/upload/images/Cash.png',
+                title: 'Invite cashback'
             })
         }
 
@@ -537,7 +541,7 @@ app.post('/withdraw', async (req, res) => {
         const balance = await balanceModel.findOne({ id: user.id });
         const card = await addCardModel.findOne({ id: user.id, isActive: true });
 
-        if(type) {
+        if (type) {
             if (amount < 35) return res.status(400).send({ success: false, error: 'Unable to make withdrawal request' })
             if (balance.mainBalance < parseFloat(amount)) return res.status(400).send({ success: false, error: 'Insufficient Balance' })
         } else {
@@ -546,12 +550,12 @@ app.post('/withdraw', async (req, res) => {
         }
 
         let fee = 0;
-        if(type && amount < 1500) {
+        if (type && amount < 1500) {
             fee = 30
         } else {
             fee = (amount * (2 / 100))
         }
-        
+
         if (!card) return res.status(400).send({ success: false, error: 'No active payment method' })
 
         let date = new Date();
@@ -608,12 +612,12 @@ app.post('/withdraw', async (req, res) => {
             image: 'https://res.cloudinary.com/fiewin/image/upload/images/withDrawFee.png'
         })
 
-        if(type) {
+        if (type) {
             await balanceModel.updateOne({ id: user.id }, {
-            $inc: {
-                mainBalance: -parseFloat(amount)
-            }
-        })
+                $inc: {
+                    mainBalance: -parseFloat(amount)
+                }
+            })
         } else {
             await balanceModel.updateOne({ id: user.id }, {
                 $inc: {
@@ -818,11 +822,11 @@ app.post('/checkIn', async (req, res) => {
         let collection3 = db.collection('balances');
 
         const newDate = new Date();
-        const dateF = ("0" + newDate.getFullYear()).slice(-2) + '' + ("0" + newDate.getMonth()).slice(-2) + '' + ("0" + newDate.getDate()).slice(-2)
+        const dateF = ("0" + newDate.getFullYear()).slice(-2) + '' + ("0" + newDate.getMonth() + 1).slice(-2) + '' + ("0" + newDate.getDate()).slice(-2)
         const aDate = parseFloat(dateF)
 
         const nDate = new Date(Date.now() + (3600 * 1000 * 24))
-        const dateN = ("0" + nDate.getFullYear()).slice(-2) + '' + ("0" + nDate.getMonth()).slice(-2) + '' + ("0" + nDate.getDate()).slice(-2)
+        const dateN = ("0" + nDate.getFullYear()).slice(-2) + '' + ("0" + nDate.getMonth() + 1).slice(-2) + '' + ("0" + nDate.getDate()).slice(-2)
 
         let response = await collection.findOne({ userToken: id });
         let response3 = await collection2.findOne({ id: response?.id });
@@ -830,13 +834,13 @@ app.post('/checkIn', async (req, res) => {
         let day = aDate === date ? response3.day : 0
 
         const fi = new financialModel({
-                id: response.id,
-                title: 'CheckIn Bonus',
-                date: ('0' + newDate.getMonth()).slice(-2) + '/' + ('0' + newDate.getDate()).slice(-2) + ' ' + ('0' + newDate.getHours()).slice(-2) + ':' + ('0' + newDate.getMinutes()).slice(-2),
-                amount: day === 0 ? 1 : day === 1 || day === 2 || day === 3 ? 2 : 3,
-                type: true,
-                image: 'https://res.cloudinary.com/fiewin/image/upload/images/checkInReward.png'
-            })
+            id: response?.id,
+            title: 'CheckIn Bonus',
+            date: ('0' + newDate.getMonth()).slice(-2) + '/' + ('0' + newDate.getDate()).slice(-2) + ' ' + ('0' + newDate.getHours()).slice(-2) + ':' + ('0' + newDate.getMinutes()).slice(-2),
+            amount: day === 0 ? 1 : day === 1 || day === 2 || day === 3 ? 2 : 3,
+            type: true,
+            image: 'https://res.cloudinary.com/fiewin/image/upload/images/checkInReward.png'
+        })
 
         if (aDate === date || aDate > date) {
             await collection3.updateOne({ id: response.id }, {
@@ -962,7 +966,7 @@ app.post('/fetchRefDetail', async (req, res) => {
         let collection2 = db.collection('newrefs');
 
         let per = ("0" + new Date().getDate()).slice(-2) + "" + ("0" + new Date().getMonth() + 1).slice(-2) + "" + ("0" + new Date().getFullYear()).slice(-4)
-        
+
         let resp = await collection.findOne({ userToken: id });
         let a = await collection2.find({ id: resp.id, period: parseFloat(per) }).toArray()
         let b = await collection2.find({ id: resp.id }).toArray()
@@ -995,7 +999,7 @@ app.post('/fetchRefDetail', async (req, res) => {
 
         return res.status(200).send({ success: true, todayInv: eliminateDuplicates(a).length, todayInc: total, totalInv: eliminateDuplicates(b).length, totalInc: total2, data: c })
     } catch (error) {
-        
+
     }
 });
 
@@ -1010,13 +1014,13 @@ app.post('/fetchReff', async (req, res) => {
         let collection2 = db.collection('newrefs');
 
         let per = ("0" + new Date().getDate()).slice(-2) + "" + ("0" + new Date().getMonth() + 1).slice(-2) + "" + ("0" + new Date().getFullYear()).slice(-4)
-        
+
         let resp = await collection.findOne({ userToken: id });
         let c = await collection2.find({ id: resp.id }).sort({ _id: -1 }).toArray();
 
-        return res.status(200).send({ success: false, data: c})
+        return res.status(200).send({ success: false, data: c })
     } catch (error) {
-        
+
     }
 });
 
@@ -1033,9 +1037,9 @@ app.post('/fetchDailyRec', async (req, res) => {
         let resp = await collection.findOne({ userToken: id });
         let c = await collection2.find({ id: resp.id }).sort({ _id: -1 }).toArray();
 
-        return res.status(200).send({ success: true, data: c})
+        return res.status(200).send({ success: true, data: c })
     } catch (error) {
-        
+
     }
 })
 
@@ -1050,12 +1054,12 @@ app.post('/fetchFinancialRecords', async (req, res) => {
         let collection2 = db.collection('financials');
 
         let d = await collection.findOne({ userToken: id })
-        
+
         financialModel.find({ id: d.id }).sort({ _id: -1 }).limit(10).then((response) => {
             return res.status(200).send({ success: true, data: response })
         })
     } catch (error) {
-        
+
     }
 })
 
@@ -1111,7 +1115,7 @@ app.post('/rechargeRecords', async (req, res) => {
 
         const user = await userModel.findOne({ userToken: id })
         const records = await depositModel.find({ id: user.id })
-        
+
         if (records.length === 0) return res.status(200).send({ success: true, isData: false })
 
         return res.status(200).send({ success: true, isData: true, data: records })
@@ -1175,7 +1179,7 @@ app.post('/placeFastParityBet', async (req, res) => {
         let MBalance = parseFloat(response2.mainBalance)
         let DBalance = parseFloat(response2.depositBalance)
 
-        if(amount <= 0) {
+        if (amount < 10) {
             return res.status(400).send({ success: false, error: 'Unable to place bet' })
         }
 
@@ -1199,36 +1203,42 @@ app.post('/placeFastParityBet', async (req, res) => {
         })
 
         let newRef1, newRef2, newRef3;
-        if(response.lv1) {
+        if (response.lv1) {
             newRef1 = new newRefModel({
                 id: response.lv1,
                 user: response.id,
                 level: 1,
                 commission: amount * (1 / 100),
                 time: month + '/' + date + ' ' + ("0" + (new Date().getHours() + 1)).slice(-2) + ':' + ("0" + (new Date().getMinutes() + 1)).slice(-2),
-                period: parseFloat(per)
+                period: parseFloat(per),
+                image: 'https://res.cloudinary.com/fiewin/image/upload/images/lv1.png',
+                title: 'level-1 Order Commission'
             })
         }
 
-        if(response.lv2) {
+        if (response.lv2) {
             newRef2 = new newRefModel({
                 id: response.lv2,
                 user: response.id,
                 level: 2,
                 commission: amount * (0.5 / 100),
                 time: month + '/' + date + ' ' + ("0" + (new Date().getHours() + 1)).slice(-2) + ':' + ("0" + (new Date().getMinutes() + 1)).slice(-2),
-                period: parseFloat(per)
+                period: parseFloat(per),
+                image: 'https://res.cloudinary.com/fiewin/image/upload/images/lv2.png',
+                title: 'level-2 Order Commission'
             })
         }
 
-        if(response.lv3) {
+        if (response.lv3) {
             newRef3 = new newRefModel({
                 id: response.lv3,
                 user: response.id,
                 level: 3,
                 commission: amount * (0.25 / 100),
                 time: month + '/' + date + ' ' + ("0" + (new Date().getHours() + 1)).slice(-2) + ':' + ("0" + (new Date().getMinutes() + 1)).slice(-2),
-                period: parseFloat(per)
+                period: parseFloat(per),
+                image: 'https://res.cloudinary.com/fiewin/image/upload/images/lv3.png',
+                title: 'level-3 Order Commission'
             })
         }
 
@@ -1259,7 +1269,7 @@ app.post('/placeFastParityBet', async (req, res) => {
 
             fi.save()
 
-            if(response.lv1) {
+            if (response.lv1) {
                 newRef1.save()
                 collection2.findOneAndUpdate({ id: response.lv1 }, {
                     $inc: {
@@ -1268,7 +1278,7 @@ app.post('/placeFastParityBet', async (req, res) => {
                 });
             }
 
-            if(response.lv2) {
+            if (response.lv2) {
                 newRef2.save()
                 collection2.findOneAndUpdate({ id: response.lv2 }, {
                     $inc: {
@@ -1465,7 +1475,7 @@ app.post('/placeDiceBet', async (req, res) => {
         let MBalance = parseFloat(response2.mainBalance)
         let DBalance = parseFloat(response2.depositBalance)
 
-        if (amount <= 0) {
+        if (amount < 10) {
             return res.status(400).send({ success: false, error: 'Unable to place bet' })
         }
 
@@ -1495,7 +1505,9 @@ app.post('/placeDiceBet', async (req, res) => {
                 level: 1,
                 commission: amount * (2 / 100),
                 time: month + '/' + date + ' ' + ("0" + (new Date().getHours() + 1)).slice(-2) + ':' + ("0" + (new Date().getMinutes() + 1)).slice(-2),
-                period: parseFloat(per)
+                period: parseFloat(per),
+                image: 'https://res.cloudinary.com/fiewin/image/upload/images/lv1.png',
+                title: 'level-1 Order Commission'
             })
         }
 
@@ -1506,7 +1518,9 @@ app.post('/placeDiceBet', async (req, res) => {
                 level: 2,
                 commission: amount * (1 / 100),
                 time: month + '/' + date + ' ' + ("0" + (new Date().getHours() + 1)).slice(-2) + ':' + ("0" + (new Date().getMinutes() + 1)).slice(-2),
-                period: parseFloat(per)
+                period: parseFloat(per),
+                image: 'https://res.cloudinary.com/fiewin/image/upload/images/lv2.png',
+                title: 'level-2 Order Commission'
             })
         }
 
@@ -1517,7 +1531,9 @@ app.post('/placeDiceBet', async (req, res) => {
                 level: 3,
                 commission: amount * (0.5 / 100),
                 time: month + '/' + date + ' ' + ("0" + (new Date().getHours() + 1)).slice(-2) + ':' + ("0" + (new Date().getMinutes() + 1)).slice(-2),
-                period: parseFloat(per)
+                period: parseFloat(per),
+                image: 'https://res.cloudinary.com/fiewin/image/upload/images/lv3.png',
+                title: 'level-3 Order Commission'
             })
         }
 
@@ -1635,8 +1651,8 @@ async function updateDicePeriod(id) {
 
         for (let i = 0; i < getFirstItems.length; i++) {
             let m = (95 / getFirstItems[i].select).toFixed(2)
-            if(result < getFirstItems[i].select) {
-                await balanceModel.updateOne({ id: getFirstItems[i].id }, { $inc: { mainBalance: getFirstItems[i].amount * m }});
+            if (result < getFirstItems[i].select) {
+                await balanceModel.updateOne({ id: getFirstItems[i].id }, { $inc: { mainBalance: getFirstItems[i].amount * m } });
 
                 const fi = new financialModel({
                     id: getFirstItems[i].id,
@@ -1676,7 +1692,7 @@ async function updateDicePeriod(id) {
 // Minesweeper
 app.post('/placeSweeperBet', async (req, res) => {
     try {
-        const { amount, size, user} = req.body;
+        const { amount, size, user } = req.body;
         console.log(req.body)
 
         let result = await client.connect()
@@ -1697,13 +1713,13 @@ app.post('/placeSweeperBet', async (req, res) => {
         let period = ("0" + new Date().getHours()).slice(-2) + '' + ("0" + new Date().getMinutes()).slice(-2)
 
         let bomb;
-        if(size === 1) {
+        if (size === 1) {
             bomb = Math.floor(Math.random() * (4 - 1 + 1)) + 1
         } else {
-            if(size === 2) {
+            if (size === 2) {
                 bomb = Math.floor(Math.random() * (16 - 1 + 1)) + 1
             } else {
-                if(size === 3) {
+                if (size === 3) {
                     bomb = Math.floor(Math.random() * (64 - 1 + 1)) + 1
                 }
             }
@@ -1753,7 +1769,7 @@ app.post('/pendingSweeperGame', async (req, res) => {
         let response3 = await sweeperModel.find({ id: response?.id }).sort({ createdAt: -1 }).limit(1)
         let response2 = response3[0]
 
-        if(!response3[0] || response2.status) return res.status(200).send({ success: true, playing: false});
+        if (!response3[0] || response2.status) return res.status(200).send({ success: true, playing: false });
 
         return res.status(200).send({ success: true, playing: true, size: response2.size, checked: response2.checked, amount: response2.amount, ATN: response2.ATN, NCA: response2.NCA, id: response2.betId })
     } catch (error) {
@@ -1763,7 +1779,7 @@ app.post('/pendingSweeperGame', async (req, res) => {
 
 app.post('/claimBox', async (req, res) => {
     try {
-        const {user, box, id} = req.body;
+        const { user, box, id } = req.body;
         console.log(req.body);
 
         let result = await client.connect()
@@ -1773,9 +1789,9 @@ app.post('/claimBox', async (req, res) => {
 
         let response = await collection.findOne({ userToken: user });
         let response2 = await collection2.findOne({ id: response?.id, betId: id });
-        
+
         let bombNo = response2.bomb;
-        if(bombNo === box) {
+        if (bombNo === box) {
             await collection2.findOneAndUpdate({ id: response.id, betId: id }, {
                 $set: {
                     status: true,
@@ -1783,7 +1799,7 @@ app.post('/claimBox', async (req, res) => {
                 }
             })
 
-            return res.status(200).send({ success: true, bomb: true})
+            return res.status(200).send({ success: true, bomb: true })
         }
 
         if (response2?.checked.includes(box)) return res.status(200).send({ success: true, bomb: false })
@@ -1813,7 +1829,7 @@ app.post('/claimBox', async (req, res) => {
 
 app.post('/r', async (req, res) => {
     try {
-        const { id, amount} = req.body;
+        const { id, amount } = req.body;
         console.log(req.body);
 
         let result = await client.connect()
@@ -1840,7 +1856,7 @@ app.post('/r', async (req, res) => {
         })
 
         let d = await axios.post(`http://43.205.82.74/crt2.php`, { amount: 100, order: uid, url: 'https://tganand.xyz/vf122.php' })
-        
+
         o.save()
         return res.status(200).send({ success: true, url: d.data.payurl })
     } catch (error) {
@@ -1863,9 +1879,9 @@ app.post('/r2', async (req, res) => {
 
         let response = await collection2.findOne({ orderId: order });
         let response2 = await collection.findOne({ id: response?.id });
-        if(response?.status) return;
+        if (response?.status) return;
 
-        await collection3.updateOne({ id: response?.id}, {
+        await collection3.updateOne({ id: response?.id }, {
             $inc: {
                 depositBalance: response?.amount
             }
@@ -1883,9 +1899,9 @@ app.post('/r2', async (req, res) => {
             }
         })
 
-        return res.status(200).send({ success: true})
+        return res.status(200).send({ success: true })
     } catch (error) {
         console.log('Error: \n', error);
-        return res.status(200).send({ success: false, error: 'Failed to fetch order'})
+        return res.status(200).send({ success: false, error: 'Failed to fetch order' })
     }
 })
