@@ -212,7 +212,7 @@ const minesweeperSchema = new mongoose.Schema({
     betId: String
 })
 
-const dailyRecModel = new mongoose.model('dailyrec', dailyRecSchema)
+
 const newRefModel = mongoose.model('newref', newRefSchema)
 const orderBookModel = mongoose.model('order', orderBookSchema)
 const financialModel = mongoose.model('financial', financialSchema)
@@ -530,31 +530,46 @@ app.post('/withdrawalRecords', async (req, res) => {
 
 app.post('/withdraw', async (req, res) => {
     try {
-        const { id, amount } = req.body;
+        const { id, amount, type } = req.body;
         console.log(req.body)
 
         const user = await userModel.findOne({ userToken: id });
         const balance = await balanceModel.findOne({ id: user.id });
         const card = await addCardModel.findOne({ id: user.id, isActive: true });
 
-        if (balance.mainBalance < parseFloat(amount)) return res.status(400).send({ success: false, error: 'Insufficient Balance' })
+        if(type) {
+            if (amount < 35) return res.status(400).send({ success: false, error: 'Unable to make withdrawal request' })
+            if (balance.mainBalance < parseFloat(amount)) return res.status(400).send({ success: false, error: 'Insufficient Balance' })
+        } else {
+            if (amount < 31) return res.status(400).send({ success: false, error: 'Unable to make withdrawal request' })
+            if (balance.refBalance < parseFloat(amount)) return res.status(400).send({ success: false, error: 'Insufficient Balance' })
+        }
+
+        let fee = 0;
+        if(type && amount < 1500) {
+            fee = 30
+        } else {
+            fee = (amount * (2 / 100))
+        }
+        
         if (!card) return res.status(400).send({ success: false, error: 'No active payment method' })
 
         let date = new Date();
+        let l = ("0" + (date.getMonth() + 1)).slice(-2) + '/' + ("0" + (date.getDate())).slice(-2) + ' ' + ("0" + (date.getHours())).slice(-2) + ':' + ("0" + (date.getMinutes())).slice(-2)
         let rNumber = Math.floor(Math.random() * 10000)
         let eDate = date.getFullYear() + '' + ("0" + date.getMonth()).slice(-2) + '' + ("0" + date.getDate()).slice(-2) + '' + ("0" + date.getHours()).slice(-2) + '' + ("0" + date.getMinutes()).slice(-2) + '' + ("0" + date.getSeconds()).slice(-2) + '' + ("0" + date.getMilliseconds()).slice(-2) + '' + rNumber
 
         if (card.isBank === true) {
             let data = new withdrawalModel({
                 id: user.id,
-                amount: parseFloat(amount) - (parseFloat(amount) * 2 / 100),
+                amount: parseFloat(amount) - fee,
                 status: 'Pending',
                 isBank: true,
                 name: card.name,
                 account: card.account,
                 ifsc: card.ifsc,
                 wid: parseFloat(eDate),
-                fee: parseFloat(amount) * 0.02,
+                fee: fee,
                 date: ("0" + date.getMonth()).slice(-2) + '/' + ("0" + date.getDate()).slice(-2) + ' ' + ("0" + date.getHours()).slice(-2) + ':' + ("0" + date.getMinutes()).slice(-2)
             })
 
@@ -562,24 +577,53 @@ app.post('/withdraw', async (req, res) => {
         } else {
             let data = new withdrawalModel({
                 id: user.id,
-                amount: parseFloat(amount) - (parseFloat(amount) * 2 / 100),
+                amount: parseFloat(amount) - fee,
                 status: 'Pending',
                 isBank: false,
                 name: card.name,
                 upi: card.upi,
                 wid: parseFloat(eDate),
-                fee: parseFloat(amount) * 0.02,
+                fee: fee,
                 date: ("0" + date.getMonth()).slice(-2) + '/' + ("0" + date.getDate()).slice(-2) + ' ' + ("0" + date.getHours()).slice(-2) + ':' + ("0" + date.getMinutes()).slice(-2)
             })
 
             data.save()
         }
 
-        await balanceModel.updateOne({ id: user.id }, {
+        const fi = new financialModel({
+            id: user.id,
+            title: 'Withdraw',
+            date: l,
+            amount: amount - fee,
+            type: false,
+            image: 'https://res.cloudinary.com/fiewin/image/upload/images/withDraw.png'
+        })
+
+        const fi2 = new financialModel({
+            id: user.id,
+            title: 'Withdraw fee',
+            date: l,
+            amount: fee,
+            type: false,
+            image: 'https://res.cloudinary.com/fiewin/image/upload/images/withDrawFee.png'
+        })
+
+        if(type) {
+            await balanceModel.updateOne({ id: user.id }, {
             $inc: {
                 mainBalance: -parseFloat(amount)
             }
         })
+        } else {
+            await balanceModel.updateOne({ id: user.id }, {
+                $inc: {
+                    refBalance: -parseFloat(amount)
+                }
+            })
+        }
+
+        fi.save()
+        fi2.save()
 
         return res.status(200).send({ success: true })
     } catch (error) {
@@ -663,6 +707,29 @@ app.post('/claimTask', async (req, res) => {
 
         const user = await userModel.findOne({ userToken: id })
         const t = await taskModel.findOne({ id: user.id })
+        const deposit = await depositModel.find({ id: user.id, status: true })
+        const invite = await totalRefModel.findOne({ id: user.id })
+        const order = await orderBookModel.findOne({ id: user.id })
+
+        if (task === 'TASK0001') {
+            if (deposit.length === 0) return res.status(400).send({ success: false, error: 'Failed to verify task.' })
+        }
+
+        if (task === 'TASK0002') {
+            if (invite.lv1 === 0) return res.status(400).send({ success: false, error: 'Failed to verify task.' })
+        }
+
+        if (task === 'TASK0003') {
+            if ((order.parity + order.dice) < 100) return res.status(400).send({ success: false, error: 'Failed to verify task.' })
+        }
+
+        if (task === 'TASK0004') {
+            if ((order.parity + order.dice) < 1000) return res.status(400).send({ success: false, error: 'Failed to verify task.' })
+        }
+
+        if (task === 'TASK0005') {
+            if ((order.parity + order.dice) < 10000) return res.status(400).send({ success: false, error: 'Failed to verify task.' })
+        }
 
         if (t && t[task]) return res.status(400).send({ success: false, error: 'Failed to verify task.' })
 
@@ -765,7 +832,7 @@ app.post('/checkIn', async (req, res) => {
         const fi = new financialModel({
                 id: response.id,
                 title: 'CheckIn Bonus',
-            date: ('0' + newDate.getMonth()).slice(-2) + '/' + ('0' + newDate.getDate()).slice(-2) + ' ' + ('0' + newDate.getHours()).slice(-2) + ':' + ('0' + newDate.getMinutes()).slice(-2),
+                date: ('0' + newDate.getMonth()).slice(-2) + '/' + ('0' + newDate.getDate()).slice(-2) + ' ' + ('0' + newDate.getHours()).slice(-2) + ':' + ('0' + newDate.getMinutes()).slice(-2),
                 amount: day === 0 ? 1 : day === 1 || day === 2 || day === 3 ? 2 : 3,
                 type: true,
                 image: 'https://res.cloudinary.com/fiewin/image/upload/images/checkInReward.png'
@@ -1102,12 +1169,15 @@ app.post('/placeFastParityBet', async (req, res) => {
         let collection = db.collection('users');
         let collection2 = db.collection('balances');
         let collection5 = db.collection('orders')
-        const collection6 = db.collection('dailyrecs')
 
         let response = await collection.findOne({ userToken: user });
         let response2 = await collection2.findOne({ id: response.id });
         let MBalance = parseFloat(response2.mainBalance)
         let DBalance = parseFloat(response2.depositBalance)
+
+        if(amount <= 0) {
+            return res.status(400).send({ success: false, error: 'Unable to place bet' })
+        }
 
         if ((MBalance + DBalance) < amount) {
             return res.status(400).send({ success: false, error: 'Not enough balance' })
@@ -1394,6 +1464,10 @@ app.post('/placeDiceBet', async (req, res) => {
         let response2 = await collection2.findOne({ id: response.id });
         let MBalance = parseFloat(response2.mainBalance)
         let DBalance = parseFloat(response2.depositBalance)
+
+        if (amount <= 0) {
+            return res.status(400).send({ success: false, error: 'Unable to place bet' })
+        }
 
         if ((MBalance + DBalance) < amount) {
             return res.status(400).send({ success: false, error: 'Not enough balance' })
