@@ -1887,27 +1887,29 @@ app.post('/r2', async (req, res) => {
 
         let response = await collection2.findOne({ orderId: order });
         let response2 = await collection.findOne({ id: response?.id });
-        if (response?.status === true) return res.status(400).send({ success: false, error: 'Unable to complete deposit' });
+        if (response?.status === true) {
+            return res.status(400).send({ success: false, error: 'Unable to complete deposit' })
+        } else {
+            await collection3.updateOne({ id: response?.id }, {
+                $inc: {
+                    depositBalance: response?.amount
+                }
+            })
 
-        await collection3.updateOne({ id: response?.id }, {
-            $inc: {
-                depositBalance: response?.amount
-            }
-        })
+            await collection2.updateOne({ id: response?.id }, {
+                $set: {
+                    status: true
+                }
+            });
 
-        await collection2.updateOne({ id: response?.id }, {
-            $set: {
-                status: true
-            }
-        });
+            await collection4.updateOne({ user: response?.id }, {
+                $inc: {
+                    totalDeposit: response?.amount
+                }
+            })
 
-        await collection4.updateOne({ user: response?.id }, {
-            $inc: {
-                totalDeposit: response?.amount
-            }
-        })
-
-        return res.status(200).send({ success: true })
+            return res.status(200).send({ success: true })
+        }
     } catch (error) {
         console.log('Error: \n', error);
         return res.status(200).send({ success: false, error: 'Failed to fetch order' })
@@ -2005,7 +2007,7 @@ app.post('/fetchLifafa', async (req, res) => {
         return res.status(200).send({ success: true, claimed: resp.totalClaimed, amount: resp.amount})
     } catch (error) {
         console.log('Error: \n', error);
-        if (!resp) return res.status(400).send({ success: false, error: 'Something went wrong' })
+        return res.status(400).send({ success: false, error: 'Something went wrong' })
     }
 })
 
