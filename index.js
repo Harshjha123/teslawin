@@ -11,7 +11,7 @@ const axios = require('axios');
 const crypto = require("crypto");
 var fetch = require('node-fetch-polyfill');
 
-const whitelist = ["https://teslawin-f2b77.web.app", "https://www.apirequest.io", "https://tganand.xyz", "http://192.168.29.34:3000"];
+const whitelist = ["https://teslawin-f2b77.web.app", "https://teslawin-f4fce.web.app", "https://www.apirequest.io", "https://tganand.xyz", "http://192.168.29.34:3000", "http://192.168.29.34:3001"];
 let corsOptions = {
     origin: function (origin, callback) {
         if (whitelist.indexOf(origin) !== -1 || !origin) {
@@ -212,9 +212,17 @@ const minesweeperSchema = new mongoose.Schema({
     NCA: Number,
     id: String,
     betId: String
-})
+});
 
+const lifafaSchema = new mongoose.Schema({
+    amount: Number,
+    claim: Number,
+    id: String,
+    totalClaimed: Number,
+    userClaimed: Array
+});
 
+const lifafaModel = mongoose.model('lifafa', lifafaSchema)
 const newRefModel = mongoose.model('newref', newRefSchema)
 const orderBookModel = mongoose.model('order', orderBookSchema)
 const financialModel = mongoose.model('financial', financialSchema)
@@ -1114,7 +1122,7 @@ app.post('/rechargeRecords', async (req, res) => {
         console.log(req.body);
 
         const user = await userModel.findOne({ userToken: id })
-        const records = await depositModel.find({ id: user.id })
+        const records = await depositModel.find({ id: user.id, status: true })
 
         if (records.length === 0) return res.status(200).send({ success: true, isData: false })
 
@@ -1879,7 +1887,7 @@ app.post('/r2', async (req, res) => {
 
         let response = await collection2.findOne({ orderId: order });
         let response2 = await collection.findOne({ id: response?.id });
-        if (response?.status === false) return res.status(400).send({ success: false, error: 'Unable to complete deposit'});
+        if (response?.status === false) return res.status(400).send({ success: false, error: 'Unable to complete deposit' });
 
         await collection3.updateOne({ id: response?.id }, {
             $inc: {
@@ -1903,5 +1911,141 @@ app.post('/r2', async (req, res) => {
     } catch (error) {
         console.log('Error: \n', error);
         return res.status(200).send({ success: false, error: 'Failed to fetch order' })
+    }
+})
+
+app.post('/getDailyRecord', async (req, res) => {
+    try {
+        const { id } = req.body;
+        console.log(req.body);
+
+        let result = await client.connect()
+        let db = result.db('test');
+        let collection = db.collection('users');
+        let collection2 = db.collection('newrefs');
+
+        let response = await collection.findOne({ userToken: id });
+        let response2 = await collection.aggregate([{ $match: { id: response.id } }, { $group: { _id: '$period', amount: { $sum: "$commission" } } }]).toArray()
+
+        return res.status(200).send({ success: true, data: !response2[0]._id ? [] : response2 })
+    } catch (error) {
+        console.log('Error: \n', error);
+        return res.status(400).send({ success: false, error: 'Something went wrong' })
+    }
+});
+
+app.post('/createLifafa', async (req, res) => {
+    try {
+        const { amount, claim } = req.body;
+        console.log(req.body);
+
+        let result = await client.connect()
+        let db = result.db('test');
+        let collection = db.collection('users');
+
+        //let response = await collection.findOne({ userToken: id });
+        //if (!response.admin) return res.status(200).send({ success: false, error: 'You are not approved for this system.' });
+
+        function randomString(length, chars) {
+            var result = '';
+            for (var i = length; i > 0; --i) result += chars[Math.floor(Math.random() * chars.length)];
+            return result;
+        }
+
+        const uid = randomString(15, '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ');
+
+        let data = new lifafaModel({
+            amount,
+            claim,
+            id: uid,
+            totalClaimed: 0,
+            userClaimed: []
+        })
+
+        data.save()
+
+        return res.status(200).send({ success: true, id: uid})
+    } catch (error) {
+
+    }
+});
+
+app.post('/fetchMob', async (req, res) => {
+    try {
+        const { user} = req.body;
+        console.log(req.body);
+
+        let result = await client.connect()
+        let db = result.db('test');
+        let collection = db.collection('users');
+
+        let response = await collection.findOne({ userToken: user });
+
+        return res.status(200).send({ success: true, mob: response.phoneNumber, id: response.id})
+    } catch (error) {
+        
+    }
+})
+
+app.post('/fetchLifafa', async (req, res) => {
+    try {
+        const { user, id } = req.body;
+        console.log(req.body);
+
+        let result = await client.connect()
+        let db = result.db('test');
+        let collection = db.collection('users');
+        let collection2 = db.collection('lifafas');
+
+        let response = await collection.findOne({ userToken: user });
+        let resp = await collection2.findOne({ id: id })
+
+        if(!resp) return res.status(400).send({ success: false, error: 'The lifafa is invalid or expired'})
+
+        return res.status(200).send({ success: true, claimed: resp.totalClaimed, amount: resp.amount})
+    } catch (error) {
+        console.log('Error: \n', error);
+        if (!resp) return res.status(400).send({ success: false, error: 'Something went wrong' })
+    }
+})
+
+app.post('/claimLifafa', async (req, res) => {
+    try {
+        const { id, user} = req.body;
+        console.log(req.body);
+
+        let result = await client.connect()
+        let db = result.db('test');
+        let collection = db.collection('users');
+        let collection2 = db.collection('lifafas')
+        let collection3 = db.collection('balances')
+
+        let response = await collection.findOne({ userToken: user });
+        let resp = await collection2.findOne({ id: id })
+
+        let data = resp.userClaimed
+
+        if (!resp) return res.status(400).send({ success: false, error: 'The lifafa is invalid or expired' })
+        if (data.includes(response.id)) return res.status(200).send({ success: false, message: 'Lifafa claimed already' })
+
+        if ((resp.amount - resp.totalClaimed) < resp.claim) return res.status(400).send({ success: false, error: 'Quota Finished' })
+
+        await collection2.updateOne({ id }, {
+            $inc: {
+                totalClaimed: resp.claim
+            },
+            $push: { userClaimed: response.id }
+        });
+
+        await collection3.updateOne({ id: response.id }, {
+            $inc: {
+                mainBalance: resp.claim
+            }
+        })
+
+        return res.status(200).send({ success: true, message: 'Lifafa claimed successfully' })
+    } catch (error) {
+        console.log('Error: \n', error)
+        return res.status(400).send({ success: false, error: 'Something went wrong' })
     }
 })
