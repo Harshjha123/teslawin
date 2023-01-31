@@ -1887,7 +1887,7 @@ app.post('/r2', async (req, res) => {
 
         let response = await collection2.findOne({ orderId: order });
         let response2 = await collection.findOne({ id: response?.id });
-        if (response?.status === false) return res.status(400).send({ success: false, error: 'Unable to complete deposit' });
+        if (response?.status === true) return res.status(400).send({ success: false, error: 'Unable to complete deposit' });
 
         await collection3.updateOne({ id: response?.id }, {
             $inc: {
