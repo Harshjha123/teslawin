@@ -29,7 +29,7 @@ app.use(cors(corsOptions));
 
 //mongodb+srv://teslawinadmin:anand0024@cluster0.ubmxhuq.mongodb.net/?retryWrites=true&w=majority
 //mongodb+srv://biomeeadmin:jcxfYgWQKLOzxzhn@cluster0.xgynqbe.mongodb.net/?retryWrites=true&w=majority
-const uri = "mongodb+srv://teslawinadmin:anand0024@cluster0.ubmxhuq.mongodb.net/?retryWrites=true&w=majority"
+const uri = "mongodb+srv://biomeeadmin:jcxfYgWQKLOzxzhn@cluster0.xgynqbe.mongodb.net/?retryWrites=true&w=majority"
 mongoose.connect(uri).then(console.log('connected'))
 
 const client = new MongoClient(uri, {
@@ -206,6 +206,8 @@ const minesweeperSchema = new mongoose.Schema({
         type: Array,
         default: []
     },
+    board: Array,
+    unchecked: Array,
     amount: Number,
     bomb: Number,
     ATN: Number,
@@ -1696,7 +1698,6 @@ async function updateDicePeriod(id) {
     }
 }
 
-
 // Minesweeper
 app.post('/placeSweeperBet', async (req, res) => {
     try {
@@ -1713,6 +1714,8 @@ app.post('/placeSweeperBet', async (req, res) => {
         let MBalance = parseFloat(response2.mainBalance)
         let DBalance = parseFloat(response2.depositBalance)
 
+        if (size !== 2 && size !== 4 && size !== 8) return res.status(400).send({ success: false, error: 'Unsupported size' })
+
         if ((MBalance + DBalance) < amount) {
             return res.status(400).send({ success: false, error: 'Not enough balance' })
         }
@@ -1720,18 +1723,19 @@ app.post('/placeSweeperBet', async (req, res) => {
         let D = new Date()
         let period = ("0" + new Date().getHours()).slice(-2) + '' + ("0" + new Date().getMinutes()).slice(-2)
 
-        let bomb;
-        if (size === 1) {
-            bomb = Math.floor(Math.random() * (4 - 1 + 1)) + 1
-        } else {
-            if (size === 2) {
-                bomb = Math.floor(Math.random() * (16 - 1 + 1)) + 1
-            } else {
-                if (size === 3) {
-                    bomb = Math.floor(Math.random() * (64 - 1 + 1)) + 1
-                }
+        let board = [];
+        for (let i = 0; i < size; i++) {
+            for (let j = 0; j < size; j++) {
+                let id = parseFloat(size + "" + i + "" + j)
+                board.push(id)
             }
         }
+
+        function get_random(list) {
+            return list[Math.floor((Math.random() * list.length))];
+        }
+
+        let bomb = get_random(board)
 
         let betId = ("0" + new Date().getDate()).slice(-2) + '' + ("0" + new Date().getMonth()).slice(-2) + '' + ("0" + new Date().getFullYear()).slice(-2) + '' + ("0" + new Date().getHours()).slice(-2) + '' + ("0" + new Date().getMinutes()).slice(-2) + '' + ("0" + new Date().getSeconds()).slice(-2)
 
@@ -1744,7 +1748,9 @@ app.post('/placeSweeperBet', async (req, res) => {
             NCA: 1,
             id: response.id,
             amount: amount,
-            betId
+            betId,
+            board,
+            unchecked: board
         })
 
         UPD.save(function (err, result) {
@@ -1774,7 +1780,7 @@ app.post('/pendingSweeperGame', async (req, res) => {
         let collection = db.collection('users');
 
         let response = await collection.findOne({ userToken: id });
-        let response3 = await sweeperModel.find({ id: response?.id }).sort({ createdAt: -1 }).limit(1)
+        let response3 = await sweeperModel.find({ id: response?.id }).sort({ _id: -1 }).limit(1)
         let response2 = response3[0]
 
         if (!response3[0] || response2.status) return res.status(200).send({ success: true, playing: false });
@@ -1798,6 +1804,8 @@ app.post('/claimBox', async (req, res) => {
         let response = await collection.findOne({ userToken: user });
         let response2 = await collection2.findOne({ id: response?.id, betId: id });
 
+        if (!response2?.board?.includes(box)) return res.status(400).send({ success: false, error: 'Failed to mine' })
+
         let bombNo = response2.bomb;
         if (bombNo === box) {
             await collection2.findOneAndUpdate({ id: response.id, betId: id }, {
@@ -1807,10 +1815,24 @@ app.post('/claimBox', async (req, res) => {
                 }
             })
 
-            return res.status(200).send({ success: true, bomb: true })
+            return res.status(200).send({ success: true, bomb: true, box })
         }
 
         if (response2?.checked.includes(box)) return res.status(200).send({ success: true, bomb: false })
+
+        let a = response2?.unchecked
+
+        const index = a.indexOf(box);
+
+        if (index > -1) { // only splice array when item is found
+            a.splice(index, 1); // 2nd parameter means remove one item only
+        }
+
+        function get_random(list) {
+            return list[Math.floor((Math.random() * list.length))];
+        }
+
+        let newBomb = get_random(a)
 
         await collection2.findOneAndUpdate({ id: response.id, betId: id }, {
             $inc: {
@@ -1818,6 +1840,12 @@ app.post('/claimBox', async (req, res) => {
             },
             $push: {
                 checked: box
+            },
+            $pull: {
+                unchecked: box
+            },
+            $set: {
+                bomb: newBomb
             }
         })
 
@@ -1888,26 +1916,26 @@ app.post('/r2', async (req, res) => {
         let response = await collection2.findOne({ orderId: order });
         let response2 = await collection.findOne({ id: response?.id });
         if (response?.status === true) return res.status(400).send({ success: false, error: 'Unable to complete deposit' })
-        
-            await collection3.updateOne({ id: response?.id }, {
-                $inc: {
-                    depositBalance: response?.amount
-                }
-            })
 
-            await collection2.updateOne({ id: response?.id }, {
-                $set: {
-                    status: true
-                }
-            });
+        await collection3.updateOne({ id: response?.id }, {
+            $inc: {
+                depositBalance: response?.amount
+            }
+        })
 
-            await collection4.updateOne({ user: response?.id }, {
-                $inc: {
-                    totalDeposit: response?.amount
-                }
-            })
+        await collection2.updateOne({ id: response?.id }, {
+            $set: {
+                status: true
+            }
+        });
 
-            return res.status(200).send({ success: true })
+        await collection4.updateOne({ user: response?.id }, {
+            $inc: {
+                totalDeposit: response?.amount
+            }
+        })
+
+        return res.status(200).send({ success: true })
     } catch (error) {
         console.log('Error: \n', error);
         return res.status(400).send({ success: false, error: 'Failed to fetch order' })
@@ -1964,7 +1992,7 @@ app.post('/createLifafa', async (req, res) => {
 
         data.save()
 
-        return res.status(200).send({ success: true, id: uid})
+        return res.status(200).send({ success: true, id: uid })
     } catch (error) {
 
     }
@@ -1972,7 +2000,7 @@ app.post('/createLifafa', async (req, res) => {
 
 app.post('/fetchMob', async (req, res) => {
     try {
-        const { user} = req.body;
+        const { user } = req.body;
         console.log(req.body);
 
         let result = await client.connect()
@@ -1981,9 +2009,9 @@ app.post('/fetchMob', async (req, res) => {
 
         let response = await collection.findOne({ userToken: user });
 
-        return res.status(200).send({ success: true, mob: response.phoneNumber, id: response.id})
+        return res.status(200).send({ success: true, mob: response.phoneNumber, id: response.id })
     } catch (error) {
-        
+
     }
 })
 
@@ -2000,9 +2028,9 @@ app.post('/fetchLifafa', async (req, res) => {
         let response = await collection.findOne({ userToken: user });
         let resp = await collection2.findOne({ id: id })
 
-        if(!resp) return res.status(400).send({ success: false, error: 'The lifafa is invalid or expired'})
+        if (!resp) return res.status(400).send({ success: false, error: 'The lifafa is invalid or expired' })
 
-        return res.status(200).send({ success: true, claimed: resp.totalClaimed, amount: resp.amount})
+        return res.status(200).send({ success: true, claimed: resp.totalClaimed, amount: resp.amount })
     } catch (error) {
         console.log('Error: \n', error);
         return res.status(400).send({ success: false, error: 'Something went wrong' })
@@ -2011,7 +2039,7 @@ app.post('/fetchLifafa', async (req, res) => {
 
 app.post('/claimLifafa', async (req, res) => {
     try {
-        const { id, user} = req.body;
+        const { id, user } = req.body;
         console.log(req.body);
 
         let result = await client.connect()
@@ -2047,5 +2075,27 @@ app.post('/claimLifafa', async (req, res) => {
     } catch (error) {
         console.log('Error: \n', error)
         return res.status(400).send({ success: false, error: 'Something went wrong' })
+    }
+})
+
+app.post('/checkAgentTask', async (req, res) => {
+    try {
+        const { user } = req.body;
+        console.log(req.body);
+
+        let result = await client.connect()
+        let db = result.db('test');
+        let collection = db.collection('users');
+        let collection2 = db.collection('agents')
+
+        let response = await collection.findOne({ userToken: user });
+        let resp = await collection2.findOne({ id: response.id })
+
+        //if(!resp) return res.status(200).send({ success: true, task: false})
+
+        return res.status(200).send({ success: true, task: false, invited: 0, level: 1})
+    } catch (error) {
+        console.log('Error: \n', error);
+        return res.status(400).send({ success: false, error: 'Something went wrong'})
     }
 })
