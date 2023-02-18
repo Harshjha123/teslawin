@@ -1791,6 +1791,40 @@ app.post('/pendingSweeperGame', async (req, res) => {
     }
 })
 
+app.post('/stopGame', async (req, res) => {
+    try {
+        const { user, id } = req.body;
+        console.log(req.body);
+
+        let result = await client.connect()
+        let db = result.db('test')
+        let collection = db.collection('users');
+        let collection2 = db.collection('minesweepers');
+        let collection3 = db.collection('balances');
+
+        let response = await collection.findOne({ userToken: user });
+        let response2 = await collection2.findOne({ id: response?.id, betId: id });
+        let response3 = await collection.findOne({ id: response?.id });
+
+        await collection2.findOneAndUpdate({ id: response.id, betId: id }, {
+            $set: {
+                status: true,
+                win: false
+            }
+        })
+
+        await collection3.findOneAndUpdate({id: response.id }, {
+            $inc: {
+                mainBalance: response2.ATN
+            }
+        })
+
+        return res.status(200).send({ success: true, amount: response2.ATN})
+    } catch (error) {
+        
+    }
+})
+
 app.post('/claimBox', async (req, res) => {
     try {
         const { user, box, id } = req.body;
@@ -1815,7 +1849,7 @@ app.post('/claimBox', async (req, res) => {
                 }
             })
 
-            return res.status(200).send({ success: true, bomb: true, box })
+            return res.status(200).send({ success: true, bomb: true, box, amount: response2.amount })
         }
 
         if (response2?.checked.includes(box)) return res.status(200).send({ success: true, bomb: false })
@@ -1850,8 +1884,9 @@ app.post('/claimBox', async (req, res) => {
         })
 
         let nxt = await collection2.findOne({ id: response?.id, betId: id });
+        console.log(nxt)
 
-        return res.status(200).send({ success: true, bomb: false, checked: nxt?.checked, amount: nxt?.amount, ATN: nxt?.NTA, NCA: nxt?.NCA })
+        return res.status(200).send({ success: true, bomb: false, checked: nxt?.checked, amount: nxt?.amount, ATN: nxt?.ATN, NCA: nxt?.NCA })
     } catch (error) {
         console.log(error)
     }
