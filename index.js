@@ -1830,6 +1830,32 @@ app.post('/claimBox', async (req, res) => {
         const { user, box, id } = req.body;
         console.log(req.body);
 
+        let c = {
+            200: '',
+            201: '',
+            210: '',
+            211: '',
+            400: 9.88,
+            401: 0.66,
+            402: 0.76,
+            403: 1.04,
+            410: 1.14,
+            411: 1.23,
+            412: 1.42,
+            413: 1.9,
+            420: 2.66,
+            421: 3.42,
+            422: 4.84,
+            423: 7.22,
+            430: 11.40,
+            431: 23.75,
+            432: 71.25,
+        }
+
+        let e;
+        let index2 = c.indexOf(box);
+        if (index2 >= 0 && index2 < c.length - 1) {e = c[index2 + 1]}
+
         let result = await client.connect()
         let db = result.db('test')
         let collection = db.collection('users');
@@ -1870,7 +1896,7 @@ app.post('/claimBox', async (req, res) => {
 
         await collection2.findOneAndUpdate({ id: response.id, betId: id }, {
             $inc: {
-                ATN: 1
+                ATN: c[box]
             },
             $push: {
                 checked: box
@@ -1886,7 +1912,7 @@ app.post('/claimBox', async (req, res) => {
         let nxt = await collection2.findOne({ id: response?.id, betId: id });
         console.log(nxt)
 
-        return res.status(200).send({ success: true, bomb: false, checked: nxt?.checked, amount: nxt?.amount, ATN: nxt?.ATN, NCA: nxt?.NCA })
+        return res.status(200).send({ success: true, bomb: false, checked: nxt?.checked, amount: nxt?.amount, ATN: nxt?.ATN, NCA: e })
     } catch (error) {
         console.log(error)
     }
