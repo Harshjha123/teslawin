@@ -29,7 +29,7 @@ app.use(cors(corsOptions));
 
 //mongodb+srv://teslawinadmin:anand0024@cluster0.ubmxhuq.mongodb.net/?retryWrites=true&w=majority
 //mongodb+srv://biomeeadmin:jcxfYgWQKLOzxzhn@cluster0.xgynqbe.mongodb.net/?retryWrites=true&w=majority
-const uri = "mongodb+srv://biomeeadmin:jcxfYgWQKLOzxzhn@cluster0.xgynqbe.mongodb.net/?retryWrites=true&w=majority"
+const uri = "mongodb+srv://teslawinadmin:anand0024@cluster0.ubmxhuq.mongodb.net/?retryWrites=true&w=majority"
 mongoose.connect(uri).then(console.log('connected'))
 
 const client = new MongoClient(uri, {
