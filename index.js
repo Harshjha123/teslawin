@@ -1714,6 +1714,10 @@ app.post('/placeSweeperBet', async (req, res) => {
         let MBalance = parseFloat(response2.mainBalance)
         let DBalance = parseFloat(response2.depositBalance)
 
+        if (amount < 10) {
+            return res.status(400).send({ success: false, error: 'Unable to place bet' })
+        }
+
         if (size !== 2 && size !== 4 && size !== 8) return res.status(400).send({ success: false, error: 'Unsupported size' })
 
         if ((MBalance + DBalance) < amount) {
@@ -1806,6 +1810,8 @@ app.post('/stopGame', async (req, res) => {
         let response2 = await collection2.findOne({ id: response?.id, betId: id });
         let response3 = await collection.findOne({ id: response?.id });
 
+        if(response2.status) return res.status(400).send({ success: false, error: 'The order has been finished already'})
+
         await collection2.findOneAndUpdate({ id: response.id, betId: id }, {
             $set: {
                 status: true,
@@ -1839,6 +1845,8 @@ app.post('/claimBox', async (req, res) => {
 
         let response = await collection.findOne({ userToken: user });
         let response2 = await collection2.findOne({ id: response?.id, betId: id });
+
+        if (response2.status) return res.status(400).send({ success: false, error: 'The order has been finished already' })
 
         let bon = response2?.checked
         let bon2 = bon.length
