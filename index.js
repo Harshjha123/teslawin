@@ -167,6 +167,12 @@ const addCardSchema = new mongoose.Schema({
     iId: String
 });
 
+const agentSchema = new mongoose.Schema({
+    id: String,
+    level: Number,
+    users: Number
+})
+
 const withdrawalSchema = new mongoose.Schema({
     id: String,
     isBank: Boolean,
@@ -213,7 +219,8 @@ const minesweeperSchema = new mongoose.Schema({
     ATN: Number,
     NCA: Number,
     id: String,
-    betId: String
+    betId: String,
+    date: String
 });
 
 const lifafaSchema = new mongoose.Schema({
@@ -225,6 +232,7 @@ const lifafaSchema = new mongoose.Schema({
 });
 
 const lifafaModel = mongoose.model('lifafa', lifafaSchema)
+const agentModel = mongoose.model('agent', agentSchema)
 const newRefModel = mongoose.model('newref', newRefSchema)
 const orderBookModel = mongoose.model('order', orderBookSchema)
 const financialModel = mongoose.model('financial', financialSchema)
@@ -1118,6 +1126,81 @@ app.post('/deposit', async (req, res) => {
     }
 });
 
+app.post('/getUserAgentDetails', async (req, res) => {
+    try {
+        const { id } = req.body;
+        console.log(req.body);
+
+        let result = await client.connect()
+        let db = result.db('test')
+        let collection = db.collection('users');
+        let collection2 = db.collection('agents');
+
+        let resp = await collection.findOne({ userToken: id })
+        let resp2 = await collection2.findOne({ id: resp.id })
+
+        if(!resp2) return res.status(200).send({ success: true, task: false})
+        
+        return res.status(200).send({ success: true, level: resp2.level, users: resp2.users})
+    } catch (error) {
+    }
+})
+
+app.post('/claimAgentLevel', async (req, res) => {
+    try {
+        const { id } = req.body;
+        console.log(req.body);
+
+        let result = await client.connect()
+        let db = result.db('test')
+        let collection = db.collection('users');
+        let collection2 = db.collection('agents');
+
+        let resp = await collection.findOne({ userToken: id })
+        let resp2 = await collection2.findOne({ id: resp.id })
+
+        if(resp2.level < 7) {
+            await collection2.findOneAndUpdate({ id: resp.id}, {
+                $inc: {
+                    level: 1
+                }
+            })
+        }
+
+        return res.status(200).send({ success: true, level: resp2.level + 1, users: 0 })
+    } catch (error) {
+        
+    }
+})
+
+app.post('/startAgentTask', async (req, res) => {
+    try {
+        const { id } = req.body;
+        console.log(req.body);
+
+        let result = await client.connect()
+        let db = result.db('test')
+        let collection = db.collection('users');
+        let collection2 = db.collection('agents');
+
+        let resp = await collection.findOne({ userToken: id })
+        let resp2 = await collection2.findOne({ id: resp.id })
+
+        if (!resp2) return res.status(200).send({ success: true, task: false })
+
+        let d = new agentModel({
+            id: id,
+            users: 0,
+            level: 1
+        })
+
+        d.save()
+        return res.status(200).send({ success: true, task: true, user: 0, level: 1})
+    } catch (error) {
+        
+    }
+})
+
 app.post('/rechargeRecords', async (req, res) => {
     try {
         const { id } = req.body;
@@ -1332,6 +1415,7 @@ app.post('/myOrder', async (req, res) => {
 io.on("connection", (socket) => {
     socket.join('fastParity');
     socket.join('dice');
+    socket.join('sweeper');
 
     socket.on("bet", ({ amount, user, period, select, type }) => {
         socket.to('fastParity').emit('betForward', { amount, user, select, type, period })
@@ -1339,6 +1423,11 @@ io.on("connection", (socket) => {
 
     socket.on("betDice", ({ amount, user, period, select }) => {
         socket.to('dice').emit('betForwardDice', { amount, user, select, period })
+    });
+
+    socket.on("betSweeper", ({ amount, user, period, select, size }) => {
+        socket.to('minesweeper').emit('betForwardSweeper', { amount, user, select, period, size })
+        console.log({ amount, user, select, period })
     });
 });
 
@@ -1718,7 +1807,7 @@ app.post('/placeSweeperBet', async (req, res) => {
             return res.status(400).send({ success: false, error: 'Unable to place bet' })
         }
 
-        if (size !== 2 && size !== 4 && size !== 8) return res.status(400).send({ success: false, error: 'Unsupported size' })
+        if (size !== 2 && size !== 4) return res.status(400).send({ success: false, error: 'Unsupported size' })
 
         if ((MBalance + DBalance) < amount) {
             return res.status(400).send({ success: false, error: 'Not enough balance' })
@@ -1742,6 +1831,7 @@ app.post('/placeSweeperBet', async (req, res) => {
         let bomb = get_random(board)
 
         let betId = ("0" + new Date().getDate()).slice(-2) + '' + ("0" + new Date().getMonth()).slice(-2) + '' + ("0" + new Date().getFullYear()).slice(-2) + '' + ("0" + new Date().getHours()).slice(-2) + '' + ("0" + new Date().getMinutes()).slice(-2) + '' + ("0" + new Date().getSeconds()).slice(-2)
+        let ad = new Date()
 
         let UPD = new sweeperModel({
             period,
@@ -1749,12 +1839,13 @@ app.post('/placeSweeperBet', async (req, res) => {
             status: false,
             bomb,
             ATN: 0,
-            NCA: 1,
+            NCA: size === 4 ? (9.88 / 10) * amount : (12.03 / 10) * amount,
             id: response.id,
             amount: amount,
             betId,
             board,
-            unchecked: board
+            unchecked: board,
+            date: ('0' + ad.getMonth()).slice(-2) + "/" + ('0' + ad.getDate()).slice(-2) + " " + ('0' + ad.getHours()).slice(-2) + ":" + ('0' + ad.getMinutes()).slice(-2)
         })
 
         UPD.save(function (err, result) {
@@ -1768,7 +1859,9 @@ app.post('/placeSweeperBet', async (req, res) => {
             })
         })
 
-        return res.status(200).send({ success: true, id: betId, amount: amount, ATN: 0, NCA: 1 })
+        let a = size === 4 ? (9.88 / 10) * amount : (12.03 / 10) * amount
+
+        return res.status(200).send({ success: true, id: betId, amount: amount, ATN: 0, NCA: a })
     } catch (error) {
         console.log('Error: \n', error)
     }
@@ -1804,19 +1897,18 @@ app.post('/stopGame', async (req, res) => {
         let db = result.db('test')
         let collection = db.collection('users');
         let collection2 = db.collection('minesweepers');
-        let collection3 = db.collection('balances');
+        let collection3 = db.collection('balances'); 
 
         let response = await collection.findOne({ userToken: user });
         let response2 = await collection2.findOne({ id: response?.id, betId: id });
-        let response3 = await collection.findOne({ id: response?.id });
 
         if(response2.status) return res.status(400).send({ success: false, error: 'The order has been finished already'})
 
         await collection2.findOneAndUpdate({ id: response.id, betId: id }, {
             $set: {
                 status: true,
-                win: false
-            }
+                win: true
+            } 
         })
 
         await collection3.findOneAndUpdate({id: response.id }, {
@@ -1825,7 +1917,7 @@ app.post('/stopGame', async (req, res) => {
             }
         })
 
-        return res.status(200).send({ success: true, amount: response2.ATN})
+        return res.status(200).send({ success: true, bomb: response2.bomb, board: response2.board, amount: response2.ATN})
     } catch (error) {
         
     }
@@ -1836,8 +1928,6 @@ app.post('/claimBox', async (req, res) => {
         const { user, box, id } = req.body;
         console.log(req.body);
 
-        let c = [9.88, 0.66, 0.76, 1.04, 1.14, 1.23, 1.42, 1.9, 2.66, 3.42, 4.84, 7.22, 11.40, 23.75, 71.25]
-
         let result = await client.connect()
         let db = result.db('test')
         let collection = db.collection('users');
@@ -1846,10 +1936,18 @@ app.post('/claimBox', async (req, res) => {
         let response = await collection.findOne({ userToken: user });
         let response2 = await collection2.findOne({ id: response?.id, betId: id });
 
+        let c;
+        if (response2.size === 4) {
+            c = [9.88, 0.66, 0.76, 1.04, 1.14, 1.23, 1.42, 1.9, 2.66, 3.42, 4.84, 7.22, 11.40, 23.75, 71.25]
+        } else {
+            if (response2.size === 2) {
+                c = [12.03, 6.01, 18.05]
+            }
+        }
+
         if (response2.status) return res.status(400).send({ success: false, error: 'The order has been finished already' })
 
         let bon = response2?.checked
-        let bon2 = bon.length
         let currBon = (c[bon.length] / 10) * response2.amount
         let nextBon = (c[bon.length + 1] / 10) * response2.amount
 
@@ -1864,7 +1962,7 @@ app.post('/claimBox', async (req, res) => {
                 }
             })
 
-            return res.status(200).send({ success: true, bomb: true, box, amount: response2.amount?.toFixed(2) })
+            return res.status(200).send({ success: true, bomb: true, box, board: response2.board, checked: response2.checked, amount: response2.amount?.toFixed(2) })
         }
 
         if (response2?.checked.includes(box)) return res.status(200).send({ success: true, bomb: false })
@@ -1901,9 +1999,26 @@ app.post('/claimBox', async (req, res) => {
         let nxt = await collection2.findOne({ id: response?.id, betId: id });
         console.log(nxt)
 
-        return res.status(200).send({ success: true, bomb: false, checked: nxt?.checked, amount: nxt?.amount, ATN: nxt?.ATN.toFixed(2), NCA: nextBon.toFixed(2) })
+        let ad = new Date()
+
+        return res.status(200).send({ success: true, user: response?.id, select: box, add: currBon, date: ('0' + ad.getMonth()).slice(-2) + "/" + ('0' + ad.getDate()).slice(-2) + " " + ('0' + ad.getHours()).slice(-2) + ":" + ('0' + ad.getMinutes()).slice(-2), size: nxt?.size, bomb: false, checked: nxt?.checked, amount: nxt?.amount, ATN: nxt?.ATN.toFixed(2), NCA: nextBon.toFixed(2) })
     } catch (error) {
         console.log(error)
+    }
+})
+
+app.post('/myOrder/sweeper', async (req, res) => {
+    try {
+        const { id } = req.body;
+        console.log(req.body)
+
+        let user = await userModel.findOne({ userToken: id });
+        let myOrder = await sweeperModel.find({ id: user?.id }).sort({ _id: -1 }).limit(25)
+
+        return res.status(200).send({ success: true, data: myOrder })
+    } catch (error) {
+        console.log('Error: ', error);
+        return res.status(400).send({ success: false, error: 'Something went wrong' })
     }
 })
 
