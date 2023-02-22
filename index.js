@@ -11,8 +11,7 @@ const axios = require('axios');
 const crypto = require("crypto");
 var fetch = require('node-fetch-polyfill');
 
-//"https://teslawin-f2b77.web.app", "https://teslawin-f4fce.web.app", "https://www.apirequest.io", "https://tganand.xyz", "http://192.168.29.34:3000", "http://192.168.29.34:3001"
-const whitelist = ['*'];
+const whitelist = ["https://teslawin-f2b77.web.app", "https://teslawin-f4fce.web.app", "https://www.apirequest.io", "https://tganand.xyz", "http://192.168.29.34:3000", "http://192.168.29.34:3001"];
 let corsOptions = {
     origin: function (origin, callback) {
         if (whitelist.indexOf(origin) !== -1 || !origin) {
