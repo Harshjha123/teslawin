@@ -1155,6 +1155,8 @@ app.post('/claimAgentLevel', async (req, res) => {
         const { id, lv } = req.body;
         console.log(req.body);
 
+        if(lv < 0) return res.status(400).send({ success: false, error: 'Invalid Level'})
+
         let level = 'lv' + lv
 
         let a = {
@@ -1166,15 +1168,26 @@ app.post('/claimAgentLevel', async (req, res) => {
             lv6: 1000
         }
 
+        let b = {
+            lv1: 3,
+            lv2: 50,
+            lv3: 300,
+            lv4: 1500,
+            lv5: 4000,
+            lv6: 10000
+        }
+
         let result = await client.connect()
         let db = result.db('test')
         let collection = db.collection('users');
         let collection2 = db.collection('agents');
+        let collection3 = db.collection('balances');
 
         let resp = await collection.findOne({ userToken: id })
         let resp2 = await collection2.findOne({ id: resp.id })
 
         if(resp2.level === lv) return res.status(400).send({ success: false, error: 'Task not started'})
+        if (lv !== resp2.level) return res.status(400).send({ success: false, error: 'Level not matched' })
         if (resp2.users < a[level]) return res.status(400).send({ success: false, error: 'Task not completed' })
 
         if (resp2.level < 7) {
@@ -1184,6 +1197,13 @@ app.post('/claimAgentLevel', async (req, res) => {
                 },
                 $set: {
                     users: 0
+                }
+            })
+
+
+            await collection3.findOneAndUpdate({ id: resp.id }, {
+                $inc: {
+                    refBalance: b[level]
                 }
             })
         }
@@ -1923,6 +1943,7 @@ app.post('/stopGame', async (req, res) => {
         let response = await collection.findOne({ userToken: user });
         let response2 = await collection2.findOne({ id: response?.id, betId: id });
 
+        if(!response2) return res.status(400).send({ success: false, error: 'Mismatch'})
         if (response2.status) return res.status(400).send({ success: false, error: 'The order has been finished already' })
 
         await collection2.findOneAndUpdate({ id: response.id, betId: id }, {
