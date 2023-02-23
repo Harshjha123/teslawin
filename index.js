@@ -99,7 +99,8 @@ const userSchema = new mongoose.Schema({
     accessToken: String,
     lv1: String,
     lv2: String,
-    lv3: String
+    lv3: String,
+    effective: Boolean
 });
 
 const fastParityOrderSchema = new mongoose.Schema({
@@ -350,7 +351,8 @@ app.post('/register', async (req, res) => {
             id: uid,
             lv1: lv1 ? lv1 : null,
             lv2: lv2 ? lv2 : null,
-            lv3: lv3 ? lv3 : null
+            lv3: lv3 ? lv3 : null,
+            effective: false
         });
 
         const o = new orderBookModel({
@@ -1139,17 +1141,30 @@ app.post('/getUserAgentDetails', async (req, res) => {
         let resp = await collection.findOne({ userToken: id })
         let resp2 = await collection2.findOne({ id: resp.id })
 
-        if(!resp2) return res.status(200).send({ success: true, task: false})
-        
-        return res.status(200).send({ success: true, level: resp2.level, users: resp2.users})
+        console.log(resp2)
+
+        if (!resp2) return res.status(200).send({ success: true, task: false })
+
+        return res.status(200).send({ success: true, task: true, level: resp2.level, invited: resp2.users })
     } catch (error) {
     }
 })
 
 app.post('/claimAgentLevel', async (req, res) => {
     try {
-        const { id } = req.body;
+        const { id, lv } = req.body;
         console.log(req.body);
+
+        let level = 'lv' + lv
+
+        let a = {
+            lv1: 1,
+            lv2: 1,
+            lv3: 5,
+            lv4: 20,
+            lv5: 50,
+            lv6: 1000
+        }
 
         let result = await client.connect()
         let db = result.db('test')
@@ -1159,17 +1174,23 @@ app.post('/claimAgentLevel', async (req, res) => {
         let resp = await collection.findOne({ userToken: id })
         let resp2 = await collection2.findOne({ id: resp.id })
 
-        if(resp2.level < 7) {
-            await collection2.findOneAndUpdate({ id: resp.id}, {
+        if(resp2.level === lv) return res.status(400).send({ success: false, error: 'Task not started'})
+        if (resp2.users < a[level]) return res.status(400).send({ success: false, error: 'Task not completed' })
+
+        if (resp2.level < 7) {
+            await collection2.findOneAndUpdate({ id: resp.id }, {
                 $inc: {
                     level: 1
+                },
+                $set: {
+                    users: 0
                 }
             })
         }
 
-        return res.status(200).send({ success: true, level: resp2.level + 1, users: 0 })
+        return res.status(200).send({ success: true, level: resp2.level + 1, invited: 0 })
     } catch (error) {
-        
+
     }
 })
 
@@ -1186,18 +1207,18 @@ app.post('/startAgentTask', async (req, res) => {
         let resp = await collection.findOne({ userToken: id })
         let resp2 = await collection2.findOne({ id: resp.id })
 
-        if (!resp2) return res.status(200).send({ success: true, task: false })
+        if (resp2) return res.status(200).send({ success: false, error: 'Task started already' })
 
         let d = new agentModel({
-            id: id,
+            id: resp.id,
             users: 0,
             level: 1
         })
 
         d.save()
-        return res.status(200).send({ success: true, task: true, user: 0, level: 1})
+        return res.status(200).send({ success: true, task: true, invited: 0, level: 1 })
     } catch (error) {
-        
+
     }
 })
 
@@ -1865,7 +1886,7 @@ app.post('/placeSweeperBet', async (req, res) => {
     } catch (error) {
         console.log('Error: \n', error)
     }
-}); 
+});
 
 app.post('/pendingSweeperGame', async (req, res) => {
     try {
@@ -1897,29 +1918,29 @@ app.post('/stopGame', async (req, res) => {
         let db = result.db('test')
         let collection = db.collection('users');
         let collection2 = db.collection('minesweepers');
-        let collection3 = db.collection('balances'); 
+        let collection3 = db.collection('balances');
 
         let response = await collection.findOne({ userToken: user });
         let response2 = await collection2.findOne({ id: response?.id, betId: id });
 
-        if(response2.status) return res.status(400).send({ success: false, error: 'The order has been finished already'})
+        if (response2.status) return res.status(400).send({ success: false, error: 'The order has been finished already' })
 
         await collection2.findOneAndUpdate({ id: response.id, betId: id }, {
             $set: {
                 status: true,
                 win: true
-            } 
+            }
         })
 
-        await collection3.findOneAndUpdate({id: response.id }, {
+        await collection3.findOneAndUpdate({ id: response.id }, {
             $inc: {
                 mainBalance: response2.ATN
             }
         })
 
-        return res.status(200).send({ success: true, bomb: response2.bomb, board: response2.board, amount: response2.ATN})
+        return res.status(200).send({ success: true, bomb: response2.bomb, board: response2.board, amount: response2.ATN })
     } catch (error) {
-        
+
     }
 })
 
@@ -2077,10 +2098,44 @@ app.post('/r2', async (req, res) => {
         let collection2 = db.collection('deposits');
         let collection3 = db.collection('balances');
         let collection4 = db.collection('referrals');
+        let collection5 = db.collection('agents');
 
         let response = await collection2.findOne({ orderId: order });
         let response2 = await collection.findOne({ id: response?.id });
+        let resp = await collection5.findOne({ id: response?.id })
         if (response?.status === true) return res.status(400).send({ success: false, error: 'Unable to complete deposit' })
+
+        if (!response2.effective) {
+            await collection.updateOne({ id: response?.id }, {
+                $set: {
+                    effective: true
+                }
+            })
+
+            if (response2.lv1) {
+                await collection5.updateOne({ id: response2?.lv1 }, {
+                    $inc: {
+                        users: 1
+                    }
+                })
+            }
+
+            if (response2.lv2) {
+                await collection5.updateOne({ id: response2?.lv2 }, {
+                    $inc: {
+                        users: 1
+                    }
+                })
+            }
+
+            if(response2.lv3) {
+                await collection5.updateOne({ id: response2?.lv3 }, {
+                $inc: {
+                    users: 1
+                }
+            })
+            }
+        }
 
         await collection3.updateOne({ id: response?.id }, {
             $inc: {
@@ -2240,27 +2295,5 @@ app.post('/claimLifafa', async (req, res) => {
     } catch (error) {
         console.log('Error: \n', error)
         return res.status(400).send({ success: false, error: 'Something went wrong' })
-    }
-})
-
-app.post('/checkAgentTask', async (req, res) => {
-    try {
-        const { user } = req.body;
-        console.log(req.body);
-
-        let result = await client.connect()
-        let db = result.db('test');
-        let collection = db.collection('users');
-        let collection2 = db.collection('agents')
-
-        let response = await collection.findOne({ userToken: user });
-        let resp = await collection2.findOne({ id: response.id })
-
-        //if(!resp) return res.status(200).send({ success: true, task: false})
-
-        return res.status(200).send({ success: true, task: false, invited: 0, level: 1})
-    } catch (error) {
-        console.log('Error: \n', error);
-        return res.status(400).send({ success: false, error: 'Something went wrong'})
     }
 })
