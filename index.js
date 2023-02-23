@@ -1186,7 +1186,7 @@ app.post('/claimAgentLevel', async (req, res) => {
         let resp = await collection.findOne({ userToken: id })
         let resp2 = await collection2.findOne({ id: resp.id })
 
-        if(resp2.level === lv) return res.status(400).send({ success: false, error: 'Task not started'})
+        if(resp2.level !== lv) return res.status(400).send({ success: false, error: 'Task not started'})
         if (lv !== resp2.level) return res.status(400).send({ success: false, error: 'Level not matched' })
         if (resp2.users < a[level]) return res.status(400).send({ success: false, error: 'Task not completed' })
 
