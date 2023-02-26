@@ -1189,7 +1189,7 @@ app.post('/claimAgentLevel', async (req, res) => {
         if(resp2.level !== lv) return res.status(400).send({ success: false, error: 'Task not started'})
         if (lv !== resp2.level) return res.status(400).send({ success: false, error: 'Level not matched' })
         if (resp2.users < a[level]) return res.status(400).send({ success: false, error: 'Task not completed' })
-
+        
         if (resp2.level < 7) {
             await collection2.findOneAndUpdate({ id: resp.id }, {
                 $inc: {
@@ -1959,7 +1959,7 @@ app.post('/stopGame', async (req, res) => {
             }
         })
 
-        return res.status(200).send({ success: true, bomb: response2.bomb, board: response2.board, amount: response2.ATN })
+        return res.status(200).send({ success: true, bomb: response2.bomb, board: response2.board, checked: response2.checked, amount: response2.ATN })
     } catch (error) {
 
     }
