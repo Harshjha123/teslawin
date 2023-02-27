@@ -1902,7 +1902,7 @@ app.post('/placeSweeperBet', async (req, res) => {
 
         let a = size === 4 ? (9.88 / 10) * amount : (12.03 / 10) * amount
 
-        return res.status(200).send({ success: true, id: betId, amount: amount, ATN: 0, NCA: a })
+        return res.status(200).send({ success: true, id: betId, amount: amount?.toFixed(2), ATN: 0, NCA: a?.toFixed(2) })
     } catch (error) {
         console.log('Error: \n', error)
     }
@@ -1923,7 +1923,7 @@ app.post('/pendingSweeperGame', async (req, res) => {
 
         if (!response3[0] || response2.status) return res.status(200).send({ success: true, playing: false });
 
-        return res.status(200).send({ success: true, playing: true, size: response2.size, checked: response2.checked, amount: response2.amount, ATN: response2.ATN, NCA: response2.NCA, id: response2.betId })
+        return res.status(200).send({ success: true, playing: true, size: response2.size, checked: response2.checked, amount: response2.amount?.toFixed(2), ATN: response2.ATN?.toFixed(2), NCA: response2.NCA?.toFixed(2), id: response2.betId })
     } catch (error) {
         console.log('Error: \n', error)
     }
@@ -1959,7 +1959,7 @@ app.post('/stopGame', async (req, res) => {
             }
         })
 
-        return res.status(200).send({ success: true, bomb: response2.bomb, board: response2.board, checked: response2.checked, amount: response2.ATN })
+        return res.status(200).send({ success: true, bomb: response2.bomb, board: response2.board, checked: response2.checked, amount: response2.ATN?.toFixed(2) })
     } catch (error) {
 
     }
@@ -1974,6 +1974,7 @@ app.post('/claimBox', async (req, res) => {
         let db = result.db('test')
         let collection = db.collection('users');
         let collection2 = db.collection('minesweepers');
+        let collection3 = db.collection('balances');
 
         let response = await collection.findOne({ userToken: user });
         let response2 = await collection2.findOne({ id: response?.id, betId: id });
@@ -1986,6 +1987,8 @@ app.post('/claimBox', async (req, res) => {
                 c = [12.03, 6.01, 18.05]
             }
         }
+
+        let j = response.size === 4 ? 15 : response2.size === 2 ? 3 : 0
 
         if (response2.status) return res.status(400).send({ success: false, error: 'The order has been finished already' })
 
@@ -2039,7 +2042,23 @@ app.post('/claimBox', async (req, res) => {
         })
 
         let nxt = await collection2.findOne({ id: response?.id, betId: id });
-        console.log(nxt)
+
+        if (nxt.checked?.length === j) {
+            await collection2.findOneAndUpdate({ id: response.id, betId: id }, {
+                $set: {
+                    status: true,
+                    win: true
+                }
+            })
+
+            await collection3.findOneAndUpdate({ id: response.id }, {
+                $inc: {
+                    mainBalance: nxt.ATN
+                }
+            })
+
+            return res.status(200).send({ success: true, win: true, bomb: nxt.bomb, board: nxt.board, checked: nxt.checked, amount: nxt.ATN?.toFixed(2) })
+        }
 
         let ad = new Date()
 
